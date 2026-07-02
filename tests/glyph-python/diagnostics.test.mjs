@@ -57,6 +57,22 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ run remaps traceback correctly when facade prelude shifts lines', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-diag-prelude-'));
+  try {
+    const file = join(root, 'facade-boom.gpy');
+    writeFileSync(file, '☉("start")\nΔ ≔ JSON.loads("{bad")\n');
+    const r = ψ(['run', file]);
+    assert.notEqual(r.status, 0);
+    const text = r.stderr + r.stdout;
+    assert.match(text, /JSONDecodeError/);
+    assert.match(text, /facade-boom\.gpy:2/);
+    assert.match(text, /Δ ≔ JSON\.loads/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 τ('Υ check --show-py exposes emitted Python as secondary detail', () => {
   const root = mkdtempSync(join(tmpdir(), 'γpy-diag-show-'));
   try {
@@ -73,4 +89,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy diagnostics tests: 3 passed, 0 failed');
+console.log('\nγpy diagnostics tests: 4 passed, 0 failed');

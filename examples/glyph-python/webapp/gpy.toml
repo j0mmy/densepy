@@ -1,0 +1,10 @@
+[project]
+name = "webapp"
+python = ">=3.11"
+
+[dependencies]
+
+[gpy]
+source = "src"
+emit = "build/py"
+main = "src/main.gpy"

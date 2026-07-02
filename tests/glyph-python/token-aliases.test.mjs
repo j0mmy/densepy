@@ -62,6 +62,26 @@ function pyCompile(src) {
   }
 });
 
+τ('γ glyphs inside f-string expressions are rewritten; literal text preserved', () => {
+  const src = `ν ≔ 3\n☉(f"doubled: {ν × 2}")\n☉(f"sym × stays: {ν − 1}")\n☉(f"esc {{×}} and spec {ν:>3}")\n`;
+  const out = γcompile(src);
+  assert.equal(pyCompile(out).status, 0, out);
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.stdout.trim().split('\n'), [
+    'doubled: 6',
+    'sym × stays: 2',
+    'esc {×} and spec   3',
+  ]);
+});
+
+τ('γ glyphs inside nested f-string string literals stay literal', () => {
+  const src = `Δ ≔ {"×": 9}\n☉(f"val: {Δ['×']}")\n`;
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), 'val: 9');
+});
+
 τ('gpy CLI build/check/run works for factorial fixture', () => {
   const root = mkdtempSync(join(tmpdir(), 'γpy-cli-'));
   const out = join(root, 'factorial.py');
@@ -83,4 +103,4 @@ function pyCompile(src) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy tests: 4 passed, 0 failed');
+console.log('\nγpy tests: 6 passed, 0 failed');

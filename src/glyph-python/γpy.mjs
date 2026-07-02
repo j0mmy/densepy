@@ -42,8 +42,13 @@ const ΓSTD_NAMES = ['File', 'JSON', 'Path', 'HTTP', 'CSV', 'Table', 'Ρθ', 'Π
 const ΓSTD_PRELUDE = `import csv as _γ_csv, json as _γ_json, os as _γ_os, urllib.request as _γ_urlreq\nfrom pathlib import Path as _γ_Path\nclass File:\n    @staticmethod\n    def read(path, encoding='utf-8'):\n        return _γ_Path(path).read_text(encoding=encoding)\n    @staticmethod\n    def write(path, data, encoding='utf-8'):\n        _γ_Path(path).write_text(str(data), encoding=encoding)\n        return path\nclass JSON:\n    @staticmethod\n    def loads(text):\n        return _γ_json.loads(text)\n    @staticmethod\n    def dumps(value, **kwargs):\n        return _γ_json.dumps(value, **kwargs)\n    @staticmethod\n    def read(path, encoding='utf-8'):\n        return _γ_json.loads(File.read(path, encoding=encoding))\n    @staticmethod\n    def write(path, value, encoding='utf-8', **kwargs):\n        File.write(path, _γ_json.dumps(value, **kwargs), encoding=encoding)\n        return path\nclass Path:\n    @staticmethod\n    def join(*parts):\n        return str(_γ_Path(*parts))\n    @staticmethod\n    def exists(path):\n        return _γ_Path(path).exists()\n    @staticmethod\n    def name(path):\n        return _γ_Path(path).name\nclass HTTP:\n    @staticmethod\n    def get_text(url, encoding='utf-8'):\n        with _γ_urlreq.urlopen(url) as r:\n            return r.read().decode(encoding)\nclass CSV:\n    @staticmethod\n    def read(path, encoding='utf-8'):\n        with open(path, newline='', encoding=encoding) as f:\n            return list(_γ_csv.DictReader(f))\n    @staticmethod\n    def write(path, rows, fieldnames=None, encoding='utf-8'):\n        rows = list(rows)\n        if fieldnames is None:\n            fieldnames = list(rows[0].keys()) if rows else []\n        with open(path, 'w', newline='', encoding=encoding) as f:\n            w = _γ_csv.DictWriter(f, fieldnames=fieldnames)\n            w.writeheader()\n            w.writerows(rows)\n        return path\nclass Table:\n    @staticmethod\n    def require():\n        try:\n            import pandas as _γ_pd\n            return _γ_pd\n        except ImportError:\n            raise ImportError('GlyphPython Table facade requires pandas: pip install pandas') from None\n    @staticmethod\n    def read_csv(path, **kwargs):\n        return Table.require().read_csv(path, **kwargs)\nΡθ = Path\nΠδ = Table\n`;
 
 function γusesStdFacade(source) {
-  const src = String(source);
-  return ΓSTD_NAMES.some((name) => src.includes(name));
+  // Only code chunks count: facade names inside strings/comments must not inject the prelude.
+  let code = '';
+  γrewriteCodeOnly(source, (chunk) => {
+    code += chunk;
+    return chunk;
+  });
+  return ΓSTD_NAMES.some((name) => code.includes(name));
 }
 
 function γid(ch) {
@@ -144,6 +149,78 @@ function γcopyString(src, i, ctx) {
   return i;
 }
 
+function γfPrefix(src, i) {
+  // True when the quote at src[i] belongs to an f-string (f", rf', F""" ...).
+  let j = i - 1;
+  let letters = '';
+  while (j >= 0 && /[A-Za-z]/.test(src[j]) && letters.length < 3) {
+    letters = src[j] + letters;
+    j -= 1;
+  }
+  if (!letters || letters.length > 2) return false;
+  if (j >= 0 && γid(src[j])) return false;
+  return /[fF]/.test(letters) && /^[fFrRbBuU]+$/.test(letters);
+}
+
+function γmapExprChar(ch) {
+  if (ΓWORD.has(ch)) return ` ${ΓWORD.get(ch)} `;
+  if (ΓNUM.has(ch)) return ` ${ΓNUM.get(ch)} `;
+  if (ΓOP.has(ch)) return ` ${ΓOP.get(ch)} `;
+  return null;
+}
+
+function γcopyFString(src, i, ctx) {
+  // Literal text and {{ }} escapes stay raw; glyphs inside {…} replacement
+  // fields are rewritten; format specs (after top-level :) and nested string
+  // literals stay raw.
+  const q = src[i];
+  const triple = src.slice(i, i + 3) === q.repeat(3);
+  const endq = triple ? q.repeat(3) : q;
+  const start = i;
+  let out = '';
+  i += triple ? 3 : 1;
+  out += src.slice(start, i);
+  const frames = [];
+  while (i < src.length) {
+    const ch = src[i];
+    if (frames.length === 0) {
+      if (triple && src.slice(i, i + 3) === endq) { out += endq; i += 3; break; }
+      if (!triple && ch === q) { out += ch; i += 1; break; }
+      if (!triple && ch === '\\') { out += src.slice(i, i + 2); i += 2; continue; }
+      if (ch === '{' && src[i + 1] === '{') { out += '{{'; i += 2; continue; }
+      if (ch === '}' && src[i + 1] === '}') { out += '}}'; i += 2; continue; }
+      if (ch === '{') { frames.push({ spec: false }); out += ch; i += 1; continue; }
+      out += ch; i += 1; continue;
+    }
+    if (ch === '{') { frames.push({ spec: false }); out += ch; i += 1; continue; }
+    if (ch === '}') { frames.pop(); out += ch; i += 1; continue; }
+    const top = frames[frames.length - 1];
+    if (ch === ':' && !top.spec) { top.spec = true; out += ch; i += 1; continue; }
+    if (!top.spec && (ch === '"' || ch === "'")) {
+      const nq = ch;
+      let j = i + 1;
+      while (j < src.length) {
+        if (src[j] === '\\') { j += 2; continue; }
+        if (src[j] === nq) { j += 1; break; }
+        j += 1;
+      }
+      out += src.slice(i, j);
+      i = j;
+      continue;
+    }
+    if (!top.spec) {
+      const mapped = γmapExprChar(ch);
+      if (mapped !== null) { out += mapped; i += 1; continue; }
+    }
+    out += ch;
+    i += 1;
+  }
+  const original = src.slice(start, i);
+  γpush(ctx, out);
+  γadvance(ctx.src, original);
+  return i;
+}
+
 function γrewriteCodeChunk(chunk) {
   return String(chunk)
     .replace(/π\(([\p{L}_][\p{L}\p{N}_]*)∈([^|\)]+)\|([^\)]+)\)\s*([^\n,\)]+)/gu, '[($4) for $1 in $2 if $3]')
@@ -207,14 +284,23 @@ function γexpandMacros(source) {
   }
   flush();
   const expanded = out.join('');
-  return expanded.includes('math.prod(') && !/^\s*import\s+math\b/m.test(expanded)
-    ? `import math\n${expanded}`
-    : expanded;
+  if (expanded.includes('math.prod(') && !/^\s*import\s+math\b/m.test(expanded)) {
+    return { code: `import math\n${expanded}`, injectedLines: 1 };
+  }
+  return { code: expanded, injectedLines: 0 };
+}
+
+function γcountLines(text) {
+  let n = 0;
+  for (const ch of String(text)) if (ch === '\n') n += 1;
+  return n;
 }
 
 export function γcompileWithMap(source, opts = {}) {
   const expanded = γexpandMacros(String(source));
-  const src = γusesStdFacade(expanded) ? `${ΓSTD_PRELUDE}${expanded}` : expanded;
+  const preludeUsed = γusesStdFacade(expanded.code);
+  const src = preludeUsed ? `${ΓSTD_PRELUDE}${expanded.code}` : expanded.code;
+  const lineOffset = expanded.injectedLines + (preludeUsed ? γcountLines(ΓSTD_PRELUDE) : 0);
   const ctx = {
     out: [],
     mappings: [],
@@ -237,9 +323,10 @@ export function γcompileWithMap(source, opts = {}) {
       continue;
     }
 
-    // Strings stay λ-literal. Prefixes (f/r/b/u) are copied before quote naturally.
+    // Strings stay λ-literal, except f-string {…} expressions which are code.
+    // Prefixes (f/r/b/u) are copied before quote naturally.
     if (ch === '"' || ch === "'") {
-      i = γcopyString(src, i, ctx);
+      i = γfPrefix(src, i) ? γcopyFString(src, i, ctx) : γcopyString(src, i, ctx);
       continue;
     }
 
@@ -278,10 +365,12 @@ export function γcompileWithMap(source, opts = {}) {
   const code = ctx.out.join('').replace(/[ \t]+\n/g, '\n');
   return {
     code,
+    lineOffset,
     map: {
       version: 1,
       source: opts.sourcePath ?? null,
       generated: opts.generatedPath ?? null,
+      lineOffset,
       mappings: ctx.mappings,
     },
   };

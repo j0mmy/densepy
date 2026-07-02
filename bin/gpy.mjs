@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, existsSync, watch } from 'node:fs';
+import { join, basename, relative, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γlint } from '../src/glyph-python/γpy.mjs';
+import { γlspServe } from '../src/glyph-python/lsp.mjs';
 
 function Ωusage() {
   console.log(`Usage:
@@ -11,6 +12,7 @@ function Ωusage() {
   node bin/gpy.mjs check <file.gpy>
   node bin/gpy.mjs test [dir]
   node bin/gpy.mjs fmt [--check] <file.gpy>
+  node bin/gpy.mjs watch [file.gpy]
   node bin/gpy.mjs lint <file.gpy>
   node bin/gpy.mjs init [dir] [--name name]
   node bin/gpy.mjs deps add <package> [version]
@@ -52,9 +54,11 @@ function ΩγExcerpt(source, line) {
   return String(source).split('\n')[line - 1] ?? '';
 }
 
-function Ωremap(kind, file, source, stderr) {
-  const line = ΩlineFromPy(stderr);
-  if (!line) return '';
+function Ωremap(kind, file, source, stderr, lineOffset = 0) {
+  const pyLine = ΩlineFromPy(stderr);
+  if (!pyLine) return '';
+  const line = pyLine - lineOffset;
+  if (line < 1) return `\nγ ${kind}: ${file} (inside γ prelude, emitted python line ${pyLine})\n`;
   const excerpt = ΩγExcerpt(source, line);
   return `\nγ ${kind}: ${file}:${line}\n  ${excerpt}\n`;
 }
@@ -78,9 +82,77 @@ function Ωwalk(dir, out = []) {
   return out.sort();
 }
 
+function Ωgpy(toml) {
+  const lines = String(toml).split('\n');
+  const start = lines.findIndex((line) => line.trim() === '[gpy]');
+  const get = (key, dflt) => {
+    if (start === -1) return dflt;
+    for (let i = start + 1; i < lines.length; i += 1) {
+      const line = lines[i].trim();
+      if (line.startsWith('[')) break;
+      const m = line.match(/^([^=\s]+)\s*=\s*"([^"]*)"/);
+      if (m && m[1] === key) return m[2];
+    }
+    return dflt;
+  };
+  return {
+    source: get('source', 'src'),
+    emit: get('emit', 'build/py'),
+    main: get('main', null),
+  };
+}
+
+function ΩbuildProject() {
+  const cfg = Ωgpy(ΩreadManifest());
+  const sourceDir = join(process.cwd(), cfg.source);
+  const emitDir = join(process.cwd(), cfg.emit);
+  const files = Ωwalk(sourceDir);
+  const modules = [];
+  for (const file of files) {
+    const rel = relative(sourceDir, file);
+    const outPath = join(emitDir, rel.replace(/\.gpy$/, '.py'));
+    mkdirSync(dirname(outPath), { recursive: true });
+    const src = readFileSync(file, 'utf8');
+    const compiled = γcompileWithMap(src, { sourcePath: file, generatedPath: outPath });
+    writeFileSync(outPath, compiled.code);
+    modules.push({ gpy: file, py: outPath, source: src, lineOffset: compiled.lineOffset });
+  }
+  return { cfg, modules };
+}
+
+function ΩremapProject(built, stderr) {
+  const notes = [];
+  const re = /File "([^"]+\.py)", line (\d+)/g;
+  let m;
+  while ((m = re.exec(String(stderr ?? '')))) {
+    const mod = built.modules.find((x) => x.py === m[1]);
+    if (!mod) continue;
+    const line = Number(m[2]) - mod.lineOffset;
+    if (line < 1) continue;
+    const excerpt = String(mod.source).split('\n')[line - 1] ?? '';
+    notes.push(`γ traceback: ${relative(process.cwd(), mod.gpy)}:${line}\n  ${excerpt}`);
+  }
+  return notes.length ? `\n${notes.join('\n')}\n` : '';
+}
+
+function ΩprojectEntry(built) {
+  const main = built.cfg.main ?? join(built.cfg.source, 'main.gpy');
+  const rel = relative(built.cfg.source, main).replace(/\.gpy$/, '.py');
+  return join(process.cwd(), built.cfg.emit, rel);
+}
+
 function ΩcmdBuild(argv) {
-  const file = argv[1];
-  if (!file) return Ωbad();
+  const file = ΩfileArg(argv);
+  if (!file) {
+    try {
+      const built = ΩbuildProject();
+      process.stdout.write(`built ${built.modules.length} files -> ${built.cfg.emit}\n`);
+      return 0;
+    } catch (error) {
+      process.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+  }
   const outPath = Ωarg('-o', argv) ?? Ωarg('--out', argv);
   const mapPath = Ωarg('--map', argv);
   const src = readFileSync(file, 'utf8');
@@ -105,19 +177,43 @@ function ΩcmdCheck(argv) {
   if (argv.includes('--show-py')) ΩshowPy(result.code);
   const check = γcheck(src);
   if (check.stdout) process.stdout.write(check.stdout);
-  if (check.stderr) process.stderr.write(check.stderr + Ωremap('syntax', file, src, check.stderr));
+  if (check.stderr) process.stderr.write(check.stderr + Ωremap('syntax', file, src, check.stderr, result.lineOffset));
   if ((check.status ?? 1) === 0) process.stdout.write(`check OK ${file}\n`);
   return check.status ?? 1;
 }
 
 function ΩcmdRun(argv) {
   const file = ΩfileArg(argv);
-  if (!file) return Ωbad();
+  if (!file) {
+    let built;
+    try {
+      built = ΩbuildProject();
+    } catch (error) {
+      process.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+    const entry = ΩprojectEntry(built);
+    if (!existsSync(entry)) {
+      process.stderr.write(`entrypoint not found after build: ${entry}\n`);
+      return 1;
+    }
+    const result = spawnSync(Ωpython(), [entry, ...ΩargvAfterDash(argv)], {
+      encoding: 'utf8',
+      env: process.env,
+    });
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) {
+      const remap = (result.status ?? 1) === 0 ? '' : ΩremapProject(built, result.stderr);
+      process.stderr.write(result.stderr + remap);
+    }
+    return result.status ?? 1;
+  }
   const src = readFileSync(file, 'utf8');
-  const result = γrun(src, { argv: ΩargvAfterDash(argv), fileBacked: true });
+  const { lineOffset } = γcompileWithMap(src);
+  const result = γrun(src, { argv: ΩargvAfterDash(argv), fileBacked: true, python: Ωpython() });
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) {
-    const remap = (result.status ?? 1) === 0 ? '' : Ωremap('traceback', file, src, result.stderr);
+    const remap = (result.status ?? 1) === 0 ? '' : Ωremap('traceback', file, src, result.stderr, lineOffset);
     process.stderr.write(result.stderr + remap);
   }
   return result.status ?? 1;
@@ -159,6 +255,45 @@ function ΩcmdFmt(argv) {
   return 0;
 }
 
+function ΩcmdWatch(argv) {
+  const file = ΩfileArg(argv);
+  let targetDir;
+  let files;
+  if (file) {
+    targetDir = dirname(file);
+    files = () => [file];
+  } else {
+    const cfg = Ωgpy(ΩreadManifest());
+    targetDir = join(process.cwd(), cfg.source);
+    files = () => Ωwalk(targetDir);
+  }
+
+  const checkOnce = () => {
+    let failed = 0;
+    const list = files();
+    for (const path of list) {
+      const src = readFileSync(path, 'utf8');
+      const { lineOffset } = γcompileWithMap(src);
+      const check = γcheck(src, { python: Ωpython() });
+      if ((check.status ?? 1) !== 0) {
+        failed += 1;
+        const rel = relative(process.cwd(), path);
+        process.stderr.write(check.stderr + Ωremap('syntax', rel, src, check.stderr, lineOffset));
+      }
+    }
+    if (failed === 0) process.stdout.write(`watch: ${list.length} files OK\n`);
+    else process.stdout.write(`watch: ${failed} of ${list.length} files failed\n`);
+  };
+
+  checkOnce();
+  let timer = null;
+  watch(targetDir, { recursive: true }, () => {
+    clearTimeout(timer);
+    timer = setTimeout(checkOnce, 100);
+  });
+  return null;
+}
+
 function ΩcmdLint(argv) {
   const file = ΩfileArg(argv);
   if (!file) return Ωbad();
@@ -175,7 +310,7 @@ function ΩcmdInit(argv) {
   const root = argv.find((x, i) => i > 0 && !x.startsWith('-') && argv[i - 1] !== '--name') ?? '.';
   const name = Ωarg('--name', argv) ?? basename(root === '.' ? process.cwd() : root);
   mkdirSync(join(root, 'src'), { recursive: true });
-  const toml = `[project]\nname = "${name}"\npython = ">=3.11"\n\n[dependencies]\n\n[gpy]\nsource = "src"\nemit = "build/py"\n`;
+  const toml = `[project]\nname = "${name}"\npython = ">=3.11"\n\n[dependencies]\n\n[gpy]\nsource = "src"\nemit = "build/py"\nmain = "src/main.gpy"\n`;
   const manifest = join(root, 'gpy.toml');
   if (!existsSync(manifest)) writeFileSync(manifest, toml);
   const main = join(root, 'src/main.gpy');
@@ -230,16 +365,65 @@ function Ωdeps(toml) {
   return out;
 }
 
+function Ωvenv() {
+  return join(process.cwd(), '.venv');
+}
+
+function ΩvenvPython() {
+  const python = join(Ωvenv(), 'bin', 'python');
+  return existsSync(python) ? python : null;
+}
+
+function Ωpython() {
+  return ΩvenvPython() ?? 'python3';
+}
+
+function ΩensureVenv() {
+  const existing = ΩvenvPython();
+  if (existing) return existing;
+  const uv = spawnSync('uv', ['--version'], { encoding: 'utf8' });
+  const r = uv.status === 0
+    ? spawnSync('uv', ['venv', Ωvenv()], { encoding: 'utf8' })
+    : spawnSync('python3', ['-m', 'venv', Ωvenv()], { encoding: 'utf8' });
+  if ((r.status ?? 1) !== 0) throw new Error(`venv creation failed: ${r.stderr || r.stdout}`);
+  const created = ΩvenvPython();
+  if (!created) throw new Error(`venv created but python missing at ${join(Ωvenv(), 'bin', 'python')}`);
+  return created;
+}
+
+function Ωspecs(deps) {
+  return deps.map(([name, version]) => (version && version !== '*' ? `${name}${version}` : name));
+}
+
+function Ωinstall(specs) {
+  if (!specs.length) return 0;
+  const custom = process.env.GPY_INSTALLER;
+  const r = custom
+    ? spawnSync(custom, ['install', ...specs], { encoding: 'utf8' })
+    : spawnSync(ΩensureVenv(), ['-m', 'pip', 'install', ...specs], { encoding: 'utf8' });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  return r.status ?? 1;
+}
+
 function ΩcmdDeps(argv) {
   const sub = argv[1];
   if (sub === 'add') {
     const name = argv[2];
-    if (!name) return Ωbad();
-    const version = argv[3] ?? '*';
+    if (!name || name.startsWith('-')) return Ωbad();
+    const version = argv[3] && !argv[3].startsWith('-') ? argv[3] : '*';
     const next = ΩwriteDependency(ΩreadManifest(), name, version);
     writeFileSync(ΩmanifestPath(), next);
     process.stdout.write(`added ${name} ${version}\n`);
-    return 0;
+    if (argv.includes('--no-install')) return 0;
+    return Ωinstall(Ωspecs([[name, version]]));
+  }
+  if (sub === 'install') {
+    const specs = Ωspecs(Ωdeps(ΩreadManifest()));
+    if (!process.env.GPY_INSTALLER) ΩensureVenv();
+    const status = Ωinstall(specs);
+    if (status === 0) process.stdout.write(`installed ${specs.length} dependencies into .venv\n`);
+    return status;
   }
   if (sub === 'list') {
     for (const [name, version] of Ωdeps(ΩreadManifest())) process.stdout.write(`${name} ${version}\n`);
@@ -249,7 +433,7 @@ function ΩcmdDeps(argv) {
     const name = argv[2];
     if (!name) return Ωbad();
     const code = `import importlib.util, sys\nsys.exit(0 if importlib.util.find_spec(${JSON.stringify(name)}) else 1)`;
-    const r = spawnSync('python3', ['-c', code], { encoding: 'utf8' });
+    const r = spawnSync(Ωpython(), ['-c', code], { encoding: 'utf8' });
     if ((r.status ?? 1) === 0) {
       process.stdout.write(`dependency OK: ${name}\n`);
       return 0;
@@ -265,17 +449,30 @@ function Ωbad() {
   return 2;
 }
 
+function Ωversion() {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  process.stdout.write(`gpy ${pkg.version}\n`);
+  return 0;
+}
+
 function Ωmain(argv) {
   const cmd = argv[0];
+  if (cmd === '--version' || cmd === '-V' || cmd === 'version') return Ωversion();
   if (cmd === 'build') return ΩcmdBuild(argv);
   if (cmd === 'check') return ΩcmdCheck(argv);
   if (cmd === 'run') return ΩcmdRun(argv);
   if (cmd === 'test') return ΩcmdTest(argv);
   if (cmd === 'fmt') return ΩcmdFmt(argv);
+  if (cmd === 'watch') return ΩcmdWatch(argv);
+  if (cmd === 'lsp') {
+    γlspServe(process.stdin, process.stdout);
+    return null;
+  }
   if (cmd === 'lint') return ΩcmdLint(argv);
   if (cmd === 'init') return ΩcmdInit(argv);
   if (cmd === 'deps') return ΩcmdDeps(argv);
   return Ωbad();
 }
 
-process.exit(Ωmain(process.argv.slice(2)));
+const Ωcode = Ωmain(process.argv.slice(2));
+if (Ωcode !== null) process.exit(Ωcode);

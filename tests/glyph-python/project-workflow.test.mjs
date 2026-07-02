@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -10,6 +10,7 @@ const Υ = join(ρ, 'bin/gpy.mjs');
 function ψ(args, opts = {}) {
   return spawnSync(process.execPath, [Υ, ...args], {
     cwd: opts.cwd ?? ρ,
+    env: { ...process.env, ...(opts.env ?? {}) },
     encoding: 'utf8',
   });
 }
@@ -49,7 +50,7 @@ function τ(name, fn) {
   const root = mkdtempSync(join(tmpdir(), 'γpy-proj-deps-'));
   try {
     assert.equal(ψ(['init', root, '--name', 'deps-tool']).status, 0);
-    const add = ψ(['deps', 'add', 'rich', '>=13'], { cwd: root });
+    const add = ψ(['deps', 'add', 'rich', '>=13', '--no-install'], { cwd: root });
     assert.equal(add.status, 0, add.stderr + add.stdout);
     const toml = readFileSync(join(root, 'gpy.toml'), 'utf8');
     assert.match(toml, /\[dependencies\]/);
@@ -77,5 +78,55 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ deps install creates .venv and gpy run prefers the venv python', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-proj-venv-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'venv-tool']).status, 0);
+    const install = ψ(['deps', 'install'], { cwd: root });
+    assert.equal(install.status, 0, install.stderr + install.stdout);
+    assert.match(install.stdout, /\.venv/);
+
+    writeFileSync(join(root, 'src', 'main.gpy'), 'import sys\n☉(".venv" ∈ sys.executable)\n');
+    const run = ψ(['run'], { cwd: root });
+    assert.equal(run.status, 0, run.stderr + run.stdout);
+    assert.equal(run.stdout.trim(), 'True');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+τ('Υ deps add invokes the installer with a pip-style spec', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-proj-installer-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'installer-tool']).status, 0);
+    const stub = join(root, 'installer.sh');
+    writeFileSync(stub, '#!/bin/sh\necho "$@" >> install.log\n');
+    chmodSync(stub, 0o755);
+    const add = ψ(['deps', 'add', 'rich', '>=13'], { cwd: root, env: { GPY_INSTALLER: stub } });
+    assert.equal(add.status, 0, add.stderr + add.stdout);
+    assert.match(readFileSync(join(root, 'gpy.toml'), 'utf8'), /rich = ">=13"/);
+    assert.equal(readFileSync(join(root, 'install.log'), 'utf8').trim(), 'install rich>=13');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+τ('Υ deps install installs every manifest dependency via the installer', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-proj-install-all-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'install-all']).status, 0);
+    assert.equal(ψ(['deps', 'add', 'rich', '>=13', '--no-install'], { cwd: root }).status, 0);
+    assert.equal(ψ(['deps', 'add', 'httpx', '*', '--no-install'], { cwd: root }).status, 0);
+    const stub = join(root, 'installer.sh');
+    writeFileSync(stub, '#!/bin/sh\necho "$@" >> install.log\n');
+    chmodSync(stub, 0o755);
+    const install = ψ(['deps', 'install'], { cwd: root, env: { GPY_INSTALLER: stub } });
+    assert.equal(install.status, 0, install.stderr + install.stdout);
+    assert.equal(readFileSync(join(root, 'install.log'), 'utf8').trim(), 'install rich>=13 httpx');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy project workflow tests: 3 passed, 0 failed');
+console.log('\nγpy project workflow tests: 6 passed, 0 failed');

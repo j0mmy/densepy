@@ -1,0 +1,8 @@
+# γ dogfood: summarize scores.csv into report.txt
+rows ≔ CSV.read("scores.csv")
+scores ≔ [int(ρ["score"]) ∀ ρ ∈ rows]
+total ≔ Σ(χ∈scores) χ
+high ≔ π(χ∈scores|χ ≥ 10) χ
+report ≔ f"rows={len(rows)} total={total} high={len(high)}"
+File.write("report.txt", report)
+☉(File.read("report.txt"))

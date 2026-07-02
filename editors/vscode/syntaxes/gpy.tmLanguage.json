@@ -1,0 +1,81 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GlyphPython",
+  "scopeName": "source.gpy",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#glyph-keywords" },
+    { "include": "#glyph-constants" },
+    { "include": "#glyph-operators" },
+    { "include": "#glyph-macros" },
+    { "include": "#glyph-numerals" },
+    { "include": "#numbers" },
+    { "include": "#python-keywords" },
+    { "include": "#function-def" }
+  ],
+  "repository": {
+    "comments": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.gpy"
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "[fFrRbBuU]{0,2}\"\"\"",
+          "end": "\"\"\"",
+          "name": "string.quoted.triple.gpy"
+        },
+        {
+          "begin": "[fFrRbBuU]{0,2}'''",
+          "end": "'''",
+          "name": "string.quoted.triple.gpy"
+        },
+        {
+          "begin": "[fFrRbBuU]{0,2}\"",
+          "end": "\"|$",
+          "name": "string.quoted.double.gpy",
+          "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.gpy" }]
+        },
+        {
+          "begin": "[fFrRbBuU]{0,2}'",
+          "end": "'|$",
+          "name": "string.quoted.single.gpy",
+          "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.gpy" }]
+        }
+      ]
+    },
+    "glyph-keywords": {
+      "match": "[λ⎇∴↻∀∈⊢☉]",
+      "name": "keyword.control.gpy"
+    },
+    "glyph-constants": {
+      "match": "[⊤⊥∅]",
+      "name": "constant.language.gpy"
+    },
+    "glyph-operators": {
+      "match": "[≔≅≠≤≥×÷−∧∨¬]",
+      "name": "keyword.operator.gpy"
+    },
+    "glyph-macros": {
+      "match": "[ΣΠπ∘]",
+      "name": "support.function.macro.gpy"
+    },
+    "glyph-numerals": {
+      "match": "[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]",
+      "name": "constant.numeric.roman.gpy"
+    },
+    "numbers": {
+      "match": "\\b\\d+(\\.\\d+)?\\b",
+      "name": "constant.numeric.gpy"
+    },
+    "python-keywords": {
+      "match": "\\b(import|from|as|try|except|finally|raise|with|class|pass|break|continue|assert|yield|lambda|global|nonlocal|del|is|elif|def|return|if|else|while|for|in|and|or|not|True|False|None)\\b",
+      "name": "keyword.other.python.gpy"
+    },
+    "function-def": {
+      "match": "(?<=λ\\s|def\\s)([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "name": "entity.name.function.gpy"
+    }
+  }
+}

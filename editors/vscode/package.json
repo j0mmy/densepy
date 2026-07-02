@@ -1,0 +1,33 @@
+{
+  "name": "glyphpython-vscode",
+  "displayName": "GlyphPython",
+  "description": "Syntax highlighting for GlyphPython .gpy files.",
+  "version": "0.1.0",
+  "publisher": "glyphpython",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:glyphpython"],
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "glyphpython",
+        "aliases": ["GlyphPython", "gpy"],
+        "extensions": [".gpy"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "glyphpython",
+        "scopeName": "source.gpy",
+        "path": "./syntaxes/gpy.tmLanguage.json"
+      }
+    ]
+  }
+}

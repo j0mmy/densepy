@@ -1,0 +1,8 @@
+# γ routing table for the demo backend
+λ γroute(path):
+    ⎇ path ≅ "/":
+        ⊢ "GLY backend ready"
+    ⎇ path ≅ "/health":
+        ⊢ "ok"
+    ∴:
+        ⊢ f"no route for {path}"

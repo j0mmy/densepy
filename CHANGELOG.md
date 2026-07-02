@@ -1,0 +1,29 @@
+# Changelog
+
+## 0.2.0 — 2026-07-02
+
+Production milestone: multi-module projects, environments, live tooling.
+
+- Module system: `gpy build` / `gpy run` with no file compile the whole
+  `[gpy].source` tree to `[gpy].emit` and run the `[gpy].main` entrypoint;
+  cross-module imports work.
+- Dependencies: `gpy deps install` creates `.venv` (uv preferred, stdlib
+  venv fallback) and installs manifest deps; `gpy deps add` installs too
+  (`--no-install` to skip); `gpy run` / `deps check` prefer the venv python.
+- Diagnostics: project-mode tracebacks remap every frame to `.gpy` sources.
+- `gpy watch`: re-checks file or project on save with remapped diagnostics.
+- `gpy lsp`: zero-dependency LSP server (framed JSON-RPC/stdio) publishing
+  syntax diagnostics; VS Code extension client wired in `editors/vscode`.
+- CI: GitHub Actions workflow (ubuntu + macos, Node 20, Python 3.12).
+
+## 0.1.0 — 2026-07-01
+
+First production-hardened cut of the single-file toolchain.
+
+- Compiler correctness: f-string `{…}` expressions compile; facade prelude
+  injection is code-scoped; diagnostics account for injected prelude lines.
+- Conformance suite: γ programs verified byte-identical against plain-Python
+  baselines.
+- `gpy --version`; VS Code syntax highlighting with grammar-sync test.
+- Dogfood example `csv-report.gpy`; documented security posture
+  (unsandboxed Python runtime; `check` never executes user code).

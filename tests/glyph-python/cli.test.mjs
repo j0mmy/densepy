@@ -95,5 +95,12 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ --version prints the package version', () => {
+  const expected = JSON.parse(readFileSync(join(ρ, 'package.json'), 'utf8')).version;
+  const r = ψ(['--version']);
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.equal(r.stdout.trim(), `gpy ${expected}`);
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy CLI tests: 4 passed, 0 failed');
+console.log('\nγpy CLI tests: 5 passed, 0 failed');
