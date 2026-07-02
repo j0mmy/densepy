@@ -11,13 +11,13 @@ function Ωusage() {
   console.log(`Usage:
   node bin/gpy.mjs build <file.gpy> [-o out.py]
   node bin/gpy.mjs run <file.gpy> [-- args...]
-  node bin/gpy.mjs check <file.gpy> [--show-py] [--types]
+  node bin/gpy.mjs check <file.gpy> [--show-py] [--types] [--agent]
   node bin/gpy.mjs test [dir]
   node bin/gpy.mjs fmt [--check] [file.gpy]
   node bin/gpy.mjs watch [file.gpy]
   node bin/gpy.mjs repl
   node bin/gpy.mjs lsp
-  node bin/gpy.mjs lint [file.gpy]
+  node bin/gpy.mjs lint [file.gpy] [--agent]
   node bin/gpy.mjs init [dir] [--name name]
   node bin/gpy.mjs deps add <package> [version] [--no-install]
   node bin/gpy.mjs deps install
@@ -66,6 +66,16 @@ function Ωremap(kind, file, source, stderr, lineOffset = 0) {
   if (line < 1) return `\nγ ${kind}: ${file} (inside γ prelude, emitted python line ${pyLine})\n`;
   const excerpt = ΩγExcerpt(source, line);
   return `\nγ ${kind}: ${file}:${line}\n  ${excerpt}\n`;
+}
+
+// AXI-style agent diagnostics: one line per event, smallest schema that
+// lets an agent decide the next action. Measured (o200k_base): a check
+// failure is 116 tokens as a raw traceback, 23 as JSON, 12 as this line.
+function ΩagentErr(file, source, stderr, lineOffset) {
+  const pyLine = ΩlineFromPy(stderr);
+  const line = pyLine ? Math.max(1, pyLine - lineOffset) : '?';
+  const msg = String(stderr ?? '').trim().split('\n').filter(Boolean).pop() ?? 'error';
+  return `err ${file}:${line} ${msg.trim()}\n`;
 }
 
 function ΩshowPy(py) {
@@ -207,14 +217,21 @@ function ΩcmdCheck(argv) {
   const file = ΩfileArg(argv);
   if (!file) return Ωbad();
   const src = readFileSync(file, 'utf8');
+  const agent = argv.includes('--agent');
   const result = γcompileWithMap(src, { sourcePath: file });
   if (argv.includes('--show-py')) ΩshowPy(result.code);
   const check = γcheck(src);
-  if (check.stdout) process.stdout.write(check.stdout);
-  if (check.stderr) process.stderr.write(check.stderr + Ωremap('syntax', file, src, check.stderr, result.lineOffset));
-  if ((check.status ?? 1) !== 0) return check.status ?? 1;
+  if ((check.status ?? 1) !== 0) {
+    if (agent) {
+      process.stderr.write(ΩagentErr(file, src, check.stderr, result.lineOffset));
+      return check.status ?? 1;
+    }
+    if (check.stdout) process.stdout.write(check.stdout);
+    if (check.stderr) process.stderr.write(check.stderr + Ωremap('syntax', file, src, check.stderr, result.lineOffset));
+    return check.status ?? 1;
+  }
   if (argv.includes('--types')) return Ωtypecheck(file, result);
-  process.stdout.write(`check OK ${file}\n`);
+  process.stdout.write(agent ? `ok ${file}\n` : `check OK ${file}\n`);
   return 0;
 }
 
@@ -245,12 +262,17 @@ function ΩcmdRun(argv) {
     return result.status ?? 1;
   }
   const src = readFileSync(file, 'utf8');
+  const agent = argv.includes('--agent');
   const { lineOffset } = γcompileWithMap(src);
   const result = γrun(src, { argv: ΩargvAfterDash(argv), fileBacked: true, python: Ωpython() });
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) {
-    const remap = (result.status ?? 1) === 0 ? '' : Ωremap('traceback', file, src, result.stderr, lineOffset);
-    process.stderr.write(result.stderr + remap);
+    if (agent && (result.status ?? 1) !== 0) {
+      process.stderr.write(ΩagentErr(file, src, result.stderr, lineOffset));
+    } else {
+      const remap = (result.status ?? 1) === 0 ? '' : Ωremap('traceback', file, src, result.stderr, lineOffset);
+      process.stderr.write(result.stderr + remap);
+    }
   }
   return result.status ?? 1;
 }
@@ -397,6 +419,11 @@ function ΩcmdRepl() {
 }
 
 function ΩcmdLint(argv) {
+  const agent = argv.includes('--agent');
+  const φemit = (warnings) => {
+    const prefix = agent ? 'warn ' : '';
+    process.stderr.write(warnings.map((w) => `${prefix}${w}`).join('\n') + '\n');
+  };
   const file = ΩfileArg(argv);
   if (!file) {
     let files;
@@ -409,18 +436,18 @@ function ΩcmdLint(argv) {
     const warnings = files.flatMap((path) =>
       γlint(readFileSync(path, 'utf8'), { path: relative(process.cwd(), path) }));
     if (warnings.length) {
-      process.stderr.write(warnings.join('\n') + '\n');
+      φemit(warnings);
       return 1;
     }
-    process.stdout.write(`lint OK ${files.length} files\n`);
+    process.stdout.write(agent ? `ok ${files.length} files\n` : `lint OK ${files.length} files\n`);
     return 0;
   }
   const warnings = γlint(readFileSync(file, 'utf8'), { path: file });
   if (warnings.length) {
-    process.stderr.write(warnings.join('\n') + '\n');
+    φemit(warnings);
     return 1;
   }
-  process.stdout.write(`lint OK ${file}\n`);
+  process.stdout.write(agent ? `ok ${file}\n` : `lint OK ${file}\n`);
   return 0;
 }
 

@@ -15,7 +15,7 @@ block-structured code). Every spelling in the language was chosen by
 tokenizer measurement, and forms that lost (pipeline `|>`, glyph
 keywords) were rejected or demoted.
 
-**Agents: load `docs/AGENT_PACKET.md` (574 tokens) into context to write
+**Agents: load `docs/AGENT_PACKET.md` (661 tokens) into context to write
 DensePy correctly first try.**
 
 The project began as GlyphPython; the glyph surface (λ, ⎇, Σ…) still
@@ -28,7 +28,7 @@ From a fresh checkout (requires Node >= 20 and Python >= 3.11):
 
 ```bash
 npm link        # makes `gpy` available on PATH
-gpy --version   # gpy 0.5.0
+gpy --version   # gpy 0.6.0
 ```
 
 Or run without installing: `node bin/gpy.mjs <command>`.
@@ -52,11 +52,11 @@ Expected output for the factorial example:
 
 ```bash
 node bin/gpy.mjs build <file.gpy> [-o out.py] [--map file.map.json]
-node bin/gpy.mjs run <file.gpy> [-- args...]
-node bin/gpy.mjs check <file.gpy> [--show-py]
+node bin/gpy.mjs run <file.gpy> [--agent] [-- args...]
+node bin/gpy.mjs check <file.gpy> [--show-py] [--types] [--agent]
 node bin/gpy.mjs test [dir]
 node bin/gpy.mjs fmt [--check] <file.gpy>
-node bin/gpy.mjs lint <file.gpy>
+node bin/gpy.mjs lint [file.gpy] [--agent]
 node bin/gpy.mjs init [dir] [--name name]
 node bin/gpy.mjs deps add <package> [version] [--no-install]
 node bin/gpy.mjs deps install

@@ -42,6 +42,19 @@ gpy build / check [--types] / test / fmt --dense / lint / watch / repl / lsp
 gpy deps install|add|list|check    .venv + real installs
 ```
 
+## Diagnostics: always pass --agent
+
+`check|run|lint --agent` emit one line per event (AXI-style; 12 tokens vs
+116 for a raw traceback):
+
+```text
+ok <file>
+err <file>:<line> <message>      # exit code != 0
+warn <file>:<line> <message>
+```
+
+Program stdout is never touched; only error/report channels compact.
+
 Modules: plain Python imports between .gpy files in src/. Tracebacks and
 diagnostics point at .gpy lines. Runtime = unsandboxed Python; lint flags
 process/network/write/eval capabilities.

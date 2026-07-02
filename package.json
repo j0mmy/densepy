@@ -1,6 +1,6 @@
 {
   "name": "densepy",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "DensePy: a token-minimized, agents-only language that compiles to Python.",
   "type": "module",
   "private": true,
@@ -8,7 +8,7 @@
     "gpy": "./bin/gpy.mjs"
   },
   "scripts": {
-    "test": "node tests/glyph-python/token-aliases.test.mjs && node tests/glyph-python/cli.test.mjs && node tests/glyph-python/source-map.test.mjs && node tests/glyph-python/diagnostics.test.mjs && node tests/glyph-python/macros.test.mjs && node tests/glyph-python/stdlib-facades.test.mjs && node tests/glyph-python/project-workflow.test.mjs && node tests/glyph-python/formatter-linter.test.mjs && node tests/glyph-python/conformance.test.mjs && node tests/glyph-python/editor-grammar.test.mjs && node tests/glyph-python/project-build.test.mjs && node tests/glyph-python/watch.test.mjs && node tests/glyph-python/lsp.test.mjs && node tests/glyph-python/repl.test.mjs && node tests/glyph-python/dense-surface.test.mjs",
+    "test": "node tests/glyph-python/token-aliases.test.mjs && node tests/glyph-python/cli.test.mjs && node tests/glyph-python/source-map.test.mjs && node tests/glyph-python/diagnostics.test.mjs && node tests/glyph-python/macros.test.mjs && node tests/glyph-python/stdlib-facades.test.mjs && node tests/glyph-python/project-workflow.test.mjs && node tests/glyph-python/formatter-linter.test.mjs && node tests/glyph-python/conformance.test.mjs && node tests/glyph-python/editor-grammar.test.mjs && node tests/glyph-python/project-build.test.mjs && node tests/glyph-python/watch.test.mjs && node tests/glyph-python/lsp.test.mjs && node tests/glyph-python/repl.test.mjs && node tests/glyph-python/dense-surface.test.mjs && node tests/glyph-python/agent-output.test.mjs",
     "gpy": "node bin/gpy.mjs",
     "check": "npm test"
   },

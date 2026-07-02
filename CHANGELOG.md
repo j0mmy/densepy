@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-07-02
+
+AXI-style agent diagnostics.
+
+- `check|run|lint --agent`: one line per event — `ok <file>`,
+  `err <file>:<line> <message>`, `warn <file>:<line> <message>`.
+  Raw Python tracebacks suppressed; program stdout untouched.
+  Measured (o200k_base): a check failure costs 116 tokens as a raw
+  traceback, 23 as JSON, 12 as an agent line.
+- AGENT_PACKET.md documents the grammar ("always pass --agent");
+  packet is 661 tokens.
+
 ## 0.5.0 — 2026-07-02
 
 DensePy: agents-only rebrand + token-minimizing canonical form.
