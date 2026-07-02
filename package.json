@@ -1,5 +1,5 @@
 {
-  "name": "glyphpython",
+  "name": "densepy",
   "version": "0.5.0",
   "description": "DensePy: a token-minimized, agents-only language that compiles to Python.",
   "type": "module",

@@ -28,7 +28,7 @@ From a fresh checkout (requires Node >= 20 and Python >= 3.11):
 
 ```bash
 npm link        # makes `gpy` available on PATH
-gpy --version   # gpy 0.1.0
+gpy --version   # gpy 0.5.0
 ```
 
 Or run without installing: `node bin/gpy.mjs <command>`.
@@ -144,9 +144,8 @@ Beyond token aliases, symbolic macro forms lower to Python:
 (f∘g)(x)           -> f(g(x))
 ```
 
-Known limit (v1): macro bodies and guards must not contain commas or
-nested parentheses — the rewriter is regex-based. Use a plain
-comprehension (`[f(ρ) ∀ ρ ∈ rows]`) for anything more complex.
+Since v0.3 the macro engine is a paren-aware scanner: bodies, guards,
+and iterables may contain calls, commas, strings, and nested macros.
 
 ## Stdlib facades
 
@@ -178,7 +177,7 @@ VS Code syntax highlighting + live diagnostics for `.gpy`:
 
 ```bash
 cd editors/vscode && npm install && cd -
-ln -s "$(pwd)/editors/vscode" ~/.vscode/extensions/glyphpython-vscode
+ln -s "$(pwd)/editors/vscode" ~/.vscode/extensions/densepy-vscode
 ```
 
 Then reload VS Code. Highlighting works immediately (grammar is
@@ -188,7 +187,7 @@ it requires `gpy` on PATH (`npm link` from the repo root).
 
 ## Security posture
 
-GlyphPython compiles to ordinary Python and runs on your `python3` —
+DensePy compiles to ordinary Python and runs on your `python3` —
 the runtime is **not sandboxed**. A `.gpy` program can do anything a
 Python program can (files, network, subprocesses). `gpy check` parses
 but never executes user code; `gpy run` executes it with your
@@ -215,7 +214,7 @@ AGENTS.md                           contributor/agent rules
 Use a narrow compiler-tooling prompt:
 
 ```text
-We are working on GlyphPython, a legitimate Python-backed programming-language frontend. Scope: parser/compiler behavior, CLI, diagnostics, source maps, formatter/linter, stdlib facades, tests, docs, and packaging. Keep Python/Node/package/API boundaries stable. Keep changes focused on `.gpy -> .py` tooling. Verify with npm test and a direct gpy example run.
+We are working on DensePy, a legitimate Python-backed programming-language frontend made for agents. Scope: parser/compiler behavior, CLI, diagnostics, source maps, formatter/linter, stdlib facades, tests, docs, and packaging. Keep Python/Node/package/API boundaries stable. Keep changes focused on `.gpy -> .py` tooling. Verify with npm test and a direct gpy example run.
 ```
 
 ## Development rule

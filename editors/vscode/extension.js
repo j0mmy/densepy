@@ -5,9 +5,9 @@ let client;
 function activate() {
   client = new LanguageClient(
     'gpy',
-    'GlyphPython',
+    'DensePy',
     { command: 'gpy', args: ['lsp'] },
-    { documentSelector: [{ scheme: 'file', language: 'glyphpython' }] },
+    { documentSelector: [{ scheme: 'file', language: 'densepy' }] },
   );
   client.start();
 }
