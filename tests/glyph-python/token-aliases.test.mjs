@@ -82,6 +82,20 @@ function pyCompile(src) {
   assert.equal(r.stdout.trim(), 'val: 9');
 });
 
+τ('γ glyphs inside nested f-strings compile at every depth', () => {
+  const src = `ν ≔ 3\n☉(f"outer {f'inner {ν × 2}'} end")\n`;
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), 'outer inner 6 end');
+});
+
+τ('γ letter/numeral glyphs inside identifiers stay literal; adjacent symbol glyphs still compile', () => {
+  const src = 'Tλ ≔ 5\nνⅦ ≔ 2\n☉(Tλ + νⅦ)\n☉(f"{Tλ}")\na ≔ 1\nb ≔ 2\n☉(a∧b)\n';
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.stdout.trim().split('\n'), ['7', '5', '2']);
+});
+
 τ('gpy CLI build/check/run works for factorial fixture', () => {
   const root = mkdtempSync(join(tmpdir(), 'γpy-cli-'));
   const out = join(root, 'factorial.py');
@@ -103,4 +117,4 @@ function pyCompile(src) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy tests: 6 passed, 0 failed');
+console.log('\nγpy tests: 8 passed, 0 failed');

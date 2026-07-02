@@ -49,9 +49,14 @@ node bin/gpy.mjs deps install
 node bin/gpy.mjs deps list
 node bin/gpy.mjs deps check <package>
 node bin/gpy.mjs watch [file.gpy]
+node bin/gpy.mjs repl
 node bin/gpy.mjs lsp
+node bin/gpy.mjs check <file.gpy> --types
 node bin/gpy.mjs --version
 ```
+
+The full language reference (glyph tables, macro grammar, identifier rules,
+known limits, measured token density) lives in `docs/GLYPH_SPEC.md`.
 
 ## Project workflow
 

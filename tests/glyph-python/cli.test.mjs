@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -95,6 +95,22 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ check --types runs the configured type checker and remaps lines', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-types-'));
+  try {
+    const file = join(root, 'typed.gpy');
+    writeFileSync(file, 'Ω ≔ Π(χ∈[1, 2]) χ\n☉(Ω)\n');
+    const stub = join(root, 'typecheck.sh');
+    writeFileSync(stub, '#!/bin/sh\necho "$1:3: error: fake-type-error"\nexit 1\n');
+    chmodSync(stub, 0o755);
+    const r = ψ(['check', '--types', file], { env: { GPY_TYPECHECKER: stub } });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout + r.stderr, /typed\.gpy:2: error: fake-type-error/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 τ('Υ --version prints the package version', () => {
   const expected = JSON.parse(readFileSync(join(ρ, 'package.json'), 'utf8')).version;
   const r = ψ(['--version']);
@@ -103,4 +119,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy CLI tests: 5 passed, 0 failed');
+console.log('\nγpy CLI tests: 6 passed, 0 failed');

@@ -40,6 +40,20 @@ function τ(name, fn) {
   assert.equal(r.stdout.trim(), '7');
 });
 
+τ('v2: macro bodies and guards may contain calls, strings, subscripts, and commas', () => {
+  const src = `rows ≔ [{"s": 5}, {"s": 12}, {"s": 8}]\nΩ ≔ Σ(ρ∈rows) int(ρ["s"])\nhi ≔ π(ρ∈rows|ρ["s"] ≥ 8) max(ρ["s"], 10)\n☉(Ω)\n☉(hi)\n`;
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.stdout.trim().split('\n'), ['25', '[12, 10]']);
+});
+
+τ('v2: nested macros, guarded Σ, and composition with multi-arg calls', () => {
+  const src = `xss ≔ [[1, 2], [3, 4]]\ntot ≔ Σ(ξ∈xss) Σ(χ∈ξ) χ\nevens ≔ Σ(χ∈range(10)|χ % 2 ≅ 0) χ\nλ f(x):\n    ⊢ x + 1\nλ g(x, y):\n    ⊢ x × y\n☉(tot, evens, (f∘g)(2, 3))\n`;
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), '10 20 7');
+});
+
 τ('macro glyphs inside comments and strings are preserved', () => {
   const src = `# Σ(ν∈xs) ν stays\ns ≔ "π(ν∈xs|⊤) ν and (f∘g)(x) stay"\n☉(s)\n`;
   const py = γcompile(src);
@@ -51,4 +65,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy macro tests: 4 passed, 0 failed');
+console.log('\nγpy macro tests: 6 passed, 0 failed');

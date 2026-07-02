@@ -1,0 +1,68 @@
+# γ dogfood: token-density benchmark for the agent-first thesis.
+# Compares BPE token counts of γ source vs hand-written Python equivalents
+# (fair pairs, no compiler-injected prelude), plus raw counts for examples.
+import sys
+from pathlib import Path as P
+import tiktoken
+
+enc ≔ tiktoken.get_encoding("o200k_base")
+
+λ toks(text):
+    ⊢ len(enc.encode(text))
+
+pairs ≔ [
+    ("factorial", """λ φ(ν):
+    ⎇ ν ≤ 1:
+        ⊢ 1
+    ∴:
+        ⊢ ν × φ(ν − 1)
+☉(φ(6))
+""", """def f(n):
+    if n <= 1:
+        return 1
+    else:
+        return n * f(n - 1)
+print(f(6))
+"""),
+    ("elif-grade", """λ g(ν):
+    ⎇ ν ≥ 90:
+        ⊢ "A"
+    ∴ ⎇ ν ≥ 80:
+        ⊢ "B"
+    ∴:
+        ⊢ "C"
+""", """def g(n):
+    if n >= 90:
+        return "A"
+    elif n >= 80:
+        return "B"
+    else:
+        return "C"
+"""),
+    ("aggregate", """Ω ≔ Σ(χ∈xs|χ % 2 ≅ 0) χ × χ
+""", """total = sum((x * x) for x in xs if x % 2 == 0)
+"""),
+    ("loop-logic", """∀ χ ∈ xs:
+    ⎇ χ ∧ ⊤:
+        ☉(¬χ ∨ ⊥)
+""", """for x in xs:
+    if x and True:
+        print(not x or False)
+"""),
+]
+
+☉("=== paired equivalents (fair comparison) ===")
+Tγ ≔ 0
+Tλ ≔ 0
+∀ p ∈ pairs:
+    gt ≔ toks(p[1])
+    pt ≔ toks(p[2])
+    Tγ ≔ Tγ + gt
+    Tλ ≔ Tλ + pt
+    ☉(f"{p[0]}: gpy={gt} py={pt} ratio={gt/pt:.2f}")
+☉(f"PAIRED TOTAL: gpy={Tγ} py={Tλ} ratio={Tγ/Tλ:.2f}")
+
+☉("=== example corpus (raw γ source) ===")
+∀ f ∈ sorted(P("examples/glyph-python").rglob("*.gpy")):
+    s ≔ f.read_text()
+    ☉(f"{f.name}: chars={len(s)} tokens={toks(s)}")

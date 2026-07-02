@@ -1,21 +1,26 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, existsSync, watch } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync, existsSync, watch } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, basename, relative, dirname } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γlint } from '../src/glyph-python/γpy.mjs';
+import { spawnSync, spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γlint, γprelude } from '../src/glyph-python/γpy.mjs';
 import { γlspServe } from '../src/glyph-python/lsp.mjs';
 
 function Ωusage() {
   console.log(`Usage:
   node bin/gpy.mjs build <file.gpy> [-o out.py]
   node bin/gpy.mjs run <file.gpy> [-- args...]
-  node bin/gpy.mjs check <file.gpy>
+  node bin/gpy.mjs check <file.gpy> [--show-py] [--types]
   node bin/gpy.mjs test [dir]
-  node bin/gpy.mjs fmt [--check] <file.gpy>
+  node bin/gpy.mjs fmt [--check] [file.gpy]
   node bin/gpy.mjs watch [file.gpy]
-  node bin/gpy.mjs lint <file.gpy>
+  node bin/gpy.mjs repl
+  node bin/gpy.mjs lsp
+  node bin/gpy.mjs lint [file.gpy]
   node bin/gpy.mjs init [dir] [--name name]
-  node bin/gpy.mjs deps add <package> [version]
+  node bin/gpy.mjs deps add <package> [version] [--no-install]
+  node bin/gpy.mjs deps install
   node bin/gpy.mjs deps list
   node bin/gpy.mjs deps check <package>
 `);
@@ -169,6 +174,35 @@ function ΩcmdBuild(argv) {
   return 0;
 }
 
+function Ωtypecheck(file, compiled) {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-types-'));
+  const tmp = join(root, basename(file).replace(/\.gpy$/, '.py'));
+  try {
+    writeFileSync(tmp, compiled.code);
+    const custom = process.env.GPY_TYPECHECKER;
+    let r;
+    if (custom) {
+      r = spawnSync(custom, [tmp], { encoding: 'utf8' });
+    } else if (spawnSync('pyright', ['--version'], { encoding: 'utf8' }).status === 0) {
+      r = spawnSync('pyright', [tmp], { encoding: 'utf8' });
+    } else if (spawnSync(Ωpython(), ['-m', 'mypy', '--version'], { encoding: 'utf8' }).status === 0) {
+      r = spawnSync(Ωpython(), ['-m', 'mypy', tmp], { encoding: 'utf8' });
+    } else {
+      process.stderr.write('no type checker found: install pyright (npm i -g pyright) or mypy (gpy deps add mypy)\n');
+      return 1;
+    }
+    const esc = tmp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const remapped = String((r.stdout ?? '') + (r.stderr ?? ''))
+      .replace(new RegExp(`${esc}:(\\d+)`, 'g'), (m, n) => `${file}:${Math.max(1, Number(n) - compiled.lineOffset)}`)
+      .replaceAll(tmp, file);
+    if (remapped.trim()) process.stdout.write(remapped.endsWith('\n') ? remapped : `${remapped}\n`);
+    if ((r.status ?? 1) === 0) process.stdout.write(`types OK ${file}\n`);
+    return r.status ?? 1;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 function ΩcmdCheck(argv) {
   const file = ΩfileArg(argv);
   if (!file) return Ωbad();
@@ -178,8 +212,10 @@ function ΩcmdCheck(argv) {
   const check = γcheck(src);
   if (check.stdout) process.stdout.write(check.stdout);
   if (check.stderr) process.stderr.write(check.stderr + Ωremap('syntax', file, src, check.stderr, result.lineOffset));
-  if ((check.status ?? 1) === 0) process.stdout.write(`check OK ${file}\n`);
-  return check.status ?? 1;
+  if ((check.status ?? 1) !== 0) return check.status ?? 1;
+  if (argv.includes('--types')) return Ωtypecheck(file, result);
+  process.stdout.write(`check OK ${file}\n`);
+  return 0;
 }
 
 function ΩcmdRun(argv) {
@@ -236,10 +272,35 @@ function ΩcmdTest(argv) {
   return fail === 0 ? 0 : 1;
 }
 
+function ΩprojectFiles() {
+  const cfg = Ωgpy(ΩreadManifest());
+  return Ωwalk(join(process.cwd(), cfg.source));
+}
+
 function ΩcmdFmt(argv) {
   const checkOnly = argv.includes('--check');
   const file = argv.find((x, i) => i > 0 && x !== '--check');
-  if (!file) return Ωbad();
+  if (!file) {
+    let files;
+    try {
+      files = ΩprojectFiles();
+    } catch (error) {
+      process.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+    let changed = 0;
+    for (const path of files) {
+      const src = readFileSync(path, 'utf8');
+      const formatted = γformat(src);
+      if (formatted === src) continue;
+      changed += 1;
+      if (checkOnly) process.stderr.write(`fmt would change ${relative(process.cwd(), path)}\n`);
+      else writeFileSync(path, formatted);
+    }
+    if (checkOnly && changed > 0) return 1;
+    process.stdout.write(`fmt OK ${files.length} files\n`);
+    return 0;
+  }
   const src = readFileSync(file, 'utf8');
   const formatted = γformat(src);
   if (checkOnly) {
@@ -294,9 +355,64 @@ function ΩcmdWatch(argv) {
   return null;
 }
 
+function ΩcmdRepl() {
+  const driver = [
+    'import sys, codeop, math',
+    'ns = {"math": math}',
+    `exec(compile(${JSON.stringify(γprelude())}, '<γprelude>', 'exec'), ns)`,
+    "buf = ''",
+    'while True:',
+    '    line = sys.stdin.readline()',
+    '    if not line:',
+    '        break',
+    '    buf += line',
+    '    try:',
+    "        code = codeop.compile_command(buf, '<γ>', 'single')",
+    '    except SyntaxError as e:',
+    "        print('SyntaxError:', e)",
+    "        buf = ''",
+    '        continue',
+    '    if code is None:',
+    '        continue',
+    "    buf = ''",
+    '    try:',
+    '        exec(code, ns)',
+    '    except SystemExit:',
+    '        raise',
+    '    except BaseException as e:',
+    "        print(type(e).__name__ + ':', e)",
+  ].join('\n');
+  const py = spawn(Ωpython(), ['-u', '-c', driver], { stdio: ['pipe', 'inherit', 'inherit'] });
+  process.stderr.write('GlyphPython REPL (ctrl-d to exit)\n');
+  const rl = createInterface({ input: process.stdin });
+  rl.on('line', (line) => {
+    const compiled = γcompileWithMap(line, { bare: true }).code;
+    py.stdin.write(`${compiled}\n`);
+  });
+  rl.on('close', () => py.stdin.end());
+  py.on('exit', (code) => process.exit(code ?? 0));
+  return null;
+}
+
 function ΩcmdLint(argv) {
   const file = ΩfileArg(argv);
-  if (!file) return Ωbad();
+  if (!file) {
+    let files;
+    try {
+      files = ΩprojectFiles();
+    } catch (error) {
+      process.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+    const warnings = files.flatMap((path) =>
+      γlint(readFileSync(path, 'utf8'), { path: relative(process.cwd(), path) }));
+    if (warnings.length) {
+      process.stderr.write(warnings.join('\n') + '\n');
+      return 1;
+    }
+    process.stdout.write(`lint OK ${files.length} files\n`);
+    return 0;
+  }
   const warnings = γlint(readFileSync(file, 'utf8'), { path: file });
   if (warnings.length) {
     process.stderr.write(warnings.join('\n') + '\n');
@@ -464,6 +580,7 @@ function Ωmain(argv) {
   if (cmd === 'test') return ΩcmdTest(argv);
   if (cmd === 'fmt') return ΩcmdFmt(argv);
   if (cmd === 'watch') return ΩcmdWatch(argv);
+  if (cmd === 'repl') return ΩcmdRepl();
   if (cmd === 'lsp') {
     γlspServe(process.stdin, process.stdout);
     return null;

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0 — 2026-07-02
+
+Language-completeness milestone driven by stress-testing.
+
+- `∴ ⎇` lowers to `elif` (multi-branch chains no longer need nesting).
+- Nested f-strings compile at every depth.
+- Macro engine v2: paren-aware, string-protecting scanner — Σ/Π/π bodies,
+  guards, and iterables may contain calls, commas, strings, and nested
+  macros; guards now work on Σ/Π; ∘ composition supports chains and
+  multi-arg calls.
+- Identifier rule: λ / numeral glyphs preceded by an identifier char are
+  part of the identifier (`Tλ` stays `Tλ`); adjacent symbol glyphs (`a∧b`)
+  still compile.
+- Project-wide `gpy fmt` / `gpy lint` (no-file mode).
+- Capability lint: process execution, network access, file writes,
+  dynamic code execution.
+- `gpy check --types`: pyright/mypy handoff with lines remapped to `.gpy`
+  (GPY_TYPECHECKER override supported).
+- `gpy repl`: interactive glyph REPL (codeop-based driver, facades and
+  math preloaded).
+- `scripts/density.gpy` + docs/GLYPH_SPEC.md: measured token density —
+  glyph source is ~1.35× MORE BPE tokens than equivalent Python despite
+  fewer characters; macro forms ≈1.10×. Documented honestly in the spec.
+
 ## 0.2.0 — 2026-07-02
 
 Production milestone: multi-module projects, environments, live tooling.

@@ -169,10 +169,10 @@ function γmapExprChar(ch) {
   return null;
 }
 
-function γcopyFString(src, i, ctx) {
+function γfstringText(src, i) {
   // Literal text and {{ }} escapes stay raw; glyphs inside {…} replacement
-  // fields are rewritten; format specs (after top-level :) and nested string
-  // literals stay raw.
+  // fields are rewritten; format specs (after top-level :) and nested plain
+  // string literals stay raw; nested f-strings recurse.
   const q = src[i];
   const triple = src.slice(i, i + 3) === q.repeat(3);
   const endq = triple ? q.repeat(3) : q;
@@ -197,6 +197,12 @@ function γcopyFString(src, i, ctx) {
     const top = frames[frames.length - 1];
     if (ch === ':' && !top.spec) { top.spec = true; out += ch; i += 1; continue; }
     if (!top.spec && (ch === '"' || ch === "'")) {
+      if (γfPrefix(src, i)) {
+        const inner = γfstringText(src, i);
+        out += inner.out;
+        i = inner.end;
+        continue;
+      }
       const nq = ch;
       let j = i + 1;
       while (j < src.length) {
@@ -208,82 +214,179 @@ function γcopyFString(src, i, ctx) {
       i = j;
       continue;
     }
-    if (!top.spec) {
+    if (!top.spec && !(γid(ch) && γid(src[i - 1] ?? ''))) {
       const mapped = γmapExprChar(ch);
       if (mapped !== null) { out += mapped; i += 1; continue; }
     }
     out += ch;
     i += 1;
   }
-  const original = src.slice(start, i);
+  return { out, end: i };
+}
+
+function γcopyFString(src, i, ctx) {
+  const { out, end } = γfstringText(src, i);
   γpush(ctx, out);
-  γadvance(ctx.src, original);
+  γadvance(ctx.src, src.slice(i, end));
+  return end;
+}
+
+// Macro engine v2: string-protecting, paren-balanced scanner.
+// Σ(v∈iter[|guard]) body   -> sum((body) for v in iter[ if guard])
+// Π(v∈iter[|guard]) body   -> math.prod((body) for v in iter[ if guard])
+// π(v∈iter[|guard]) body   -> [(body) for v in iter[ if guard]]
+// (f∘g∘h)(args)            -> f(g(h(args)))
+// Bodies/guards/iterables may contain calls, commas, strings, nested macros.
+// Body extent: balanced expression up to a top-level newline, ',', '#', or closer.
+
+function γscanStringEnd(src, i) {
+  const q = src[i];
+  const triple = src.slice(i, i + 3) === q.repeat(3);
+  const endq = triple ? q.repeat(3) : q;
+  i += triple ? 3 : 1;
+  while (i < src.length) {
+    if (!triple && src[i] === '\\') { i += 2; continue; }
+    if (triple && src.slice(i, i + 3) === endq) return i + 3;
+    if (!triple && src[i] === q) return i + 1;
+    i += 1;
+  }
   return i;
 }
 
-function γrewriteCodeChunk(chunk) {
-  return String(chunk)
-    .replace(/π\(([\p{L}_][\p{L}\p{N}_]*)∈([^|\)]+)\|([^\)]+)\)\s*([^\n,\)]+)/gu, '[($4) for $1 in $2 if $3]')
-    .replace(/Σ\(([\p{L}_][\p{L}\p{N}_]*)∈([^\)]+)\)\s*([^\n,\)]+)/gu, 'sum(($3) for $1 in $2)')
-    .replace(/Π\(([\p{L}_][\p{L}\p{N}_]*)∈([^\)]+)\)\s*([^\n,\)]+)/gu, 'math.prod(($3) for $1 in $2)')
-    .replace(/\(([\p{L}_][\p{L}\p{N}_]*)∘([\p{L}_][\p{L}\p{N}_]*)\)\(([^\(\)]*)\)/gu, '$1($2($3))');
+function γmatchParen(src, i) {
+  let depth = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'") { i = γscanStringEnd(src, i); continue; }
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+    i += 1;
+  }
+  return -1;
 }
 
-function γexpandMacros(source) {
-  const src = String(source);
-  const out = [];
-  let code = '';
+function γtopIndex(text, needle) {
+  let depth = 0;
   let i = 0;
-  const flush = () => {
-    if (code) {
-      out.push(γrewriteCodeChunk(code));
-      code = '';
-    }
-  };
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '"' || ch === "'") { i = γscanStringEnd(text, i); continue; }
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+    else if (depth === 0 && ch === needle) return i;
+    i += 1;
+  }
+  return -1;
+}
 
+function γbodyEnd(src, i) {
+  let depth = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'") { i = γscanStringEnd(src, i); continue; }
+    if (depth === 0 && (ch === '\n' || ch === ',' || ch === '#')) return i;
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return i;
+      depth -= 1;
+    }
+    i += 1;
+  }
+  return i;
+}
+
+const ΓIDENT = /^[\p{L}_][\p{L}\p{N}_]*$/u;
+
+function γparseAgg(src, i) {
+  const kind = src[i];
+  let j = i + 1;
+  while (src[j] === ' ') j += 1;
+  if (src[j] !== '(') return null;
+  const close = γmatchParen(src, j);
+  if (close === -1) return null;
+  const header = src.slice(j + 1, close);
+  const at = γtopIndex(header, '∈');
+  if (at === -1) return null;
+  const varName = header.slice(0, at).trim();
+  if (!ΓIDENT.test(varName)) return null;
+  const rest = header.slice(at + 1);
+  const bar = γtopIndex(rest, '|');
+  const iter = (bar === -1 ? rest : rest.slice(0, bar)).trim();
+  const guard = bar === -1 ? null : rest.slice(bar + 1).trim();
+  if (!iter) return null;
+  let k = close + 1;
+  while (src[k] === ' ' || src[k] === '\t') k += 1;
+  const end = γbodyEnd(src, k);
+  const body = src.slice(k, end).trim();
+  if (!body) return null;
+  const B = γexpandCore(body);
+  const I = γexpandCore(iter);
+  const G = guard ? ` if ${γexpandCore(guard)}` : '';
+  const V = varName;
+  const lowered = kind === 'Σ'
+    ? `sum((${B}) for ${V} in ${I}${G})`
+    : kind === 'Π'
+      ? `math.prod((${B}) for ${V} in ${I}${G})`
+      : `[(${B}) for ${V} in ${I}${G}]`;
+  return { lowered, end };
+}
+
+function γparseCompose(src, i) {
+  const close = γmatchParen(src, i);
+  if (close === -1) return null;
+  const inner = src.slice(i + 1, close);
+  if (!inner.includes('∘')) return null;
+  const names = inner.split('∘').map((x) => x.trim());
+  if (names.length < 2 || !names.every((n) => ΓIDENT.test(n))) return null;
+  let k = close + 1;
+  while (src[k] === ' ') k += 1;
+  if (src[k] !== '(') return null;
+  const argsClose = γmatchParen(src, k);
+  if (argsClose === -1) return null;
+  const args = γexpandCore(src.slice(k + 1, argsClose));
+  let call = `${names[names.length - 1]}(${args})`;
+  for (let n = names.length - 2; n >= 0; n -= 1) call = `${names[n]}(${call})`;
+  return { lowered: call, end: argsClose + 1 };
+}
+
+function γexpandCore(src) {
+  let out = '';
+  let i = 0;
   while (i < src.length) {
     const ch = src[i];
     if (ch === '#') {
-      flush();
       const j = src.indexOf('\n', i);
-      if (j === -1) {
-        out.push(src.slice(i));
-        return out.join('');
-      }
-      out.push(src.slice(i, j));
+      if (j === -1) { out += src.slice(i); break; }
+      out += src.slice(i, j);
       i = j;
       continue;
     }
     if (ch === '"' || ch === "'") {
-      flush();
-      const q = ch;
-      const triple = src.slice(i, i + 3) === q.repeat(3);
-      const end = triple ? q.repeat(3) : q;
-      const start = i;
-      i += triple ? 3 : 1;
-      while (i < src.length) {
-        if (!triple && src[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (triple && src.slice(i, i + 3) === end) {
-          i += 3;
-          break;
-        }
-        if (!triple && src[i] === q) {
-          i += 1;
-          break;
-        }
-        i += 1;
-      }
-      out.push(src.slice(start, i));
+      const j = γscanStringEnd(src, i);
+      out += src.slice(i, j);
+      i = j;
       continue;
     }
-    code += ch;
+    const prev = out.length ? out[out.length - 1] : '';
+    if ((ch === 'Σ' || ch === 'Π' || ch === 'π') && !γid(prev)) {
+      const agg = γparseAgg(src, i);
+      if (agg) { out += agg.lowered; i = agg.end; continue; }
+    }
+    if (ch === '(' && !γid(prev)) {
+      const comp = γparseCompose(src, i);
+      if (comp) { out += comp.lowered; i = comp.end; continue; }
+    }
+    out += ch;
     i += 1;
   }
-  flush();
-  const expanded = out.join('');
+  return out;
+}
+
+function γexpandMacros(source) {
+  const expanded = γexpandCore(String(source));
   if (expanded.includes('math.prod(') && !/^\s*import\s+math\b/m.test(expanded)) {
     return { code: `import math\n${expanded}`, injectedLines: 1 };
   }
@@ -296,9 +399,13 @@ function γcountLines(text) {
   return n;
 }
 
+export function γprelude() {
+  return ΓSTD_PRELUDE;
+}
+
 export function γcompileWithMap(source, opts = {}) {
   const expanded = γexpandMacros(String(source));
-  const preludeUsed = γusesStdFacade(expanded.code);
+  const preludeUsed = !opts.bare && γusesStdFacade(expanded.code);
   const src = preludeUsed ? `${ΓSTD_PRELUDE}${expanded.code}` : expanded.code;
   const lineOffset = expanded.injectedLines + (preludeUsed ? γcountLines(ΓSTD_PRELUDE) : 0);
   const ctx = {
@@ -332,14 +439,32 @@ export function γcompileWithMap(source, opts = {}) {
 
     const sourceStart = γclone(ctx.src);
 
-    if (ΓWORD.has(ch)) {
+    // ∴ ⎇ → elif (else-if chains); lone ∴ stays else.
+    if (ch === '∴') {
+      let j = i + 1;
+      while (src[j] === ' ' || src[j] === '\t') j += 1;
+      if (src[j] === '⎇') {
+        const sourceText = src.slice(i, j + 1);
+        γemitWord(ctx, sourceText, 'elif', src[j + 1], sourceStart);
+        γadvance(ctx.src, sourceText);
+        i = j + 1;
+        continue;
+      }
+    }
+
+    // Letter/numeral glyphs (λ, Ⅰ-Ⅻ) are valid Python identifier chars:
+    // preceded by an identifier char they are PART of the identifier (Tλ),
+    // not a keyword. Symbol glyphs (∧, ∈, …) never join identifiers.
+    const inIdent = γid(ch) && γid(src[i - 1] ?? '');
+
+    if (ΓWORD.has(ch) && !inIdent) {
       γemitWord(ctx, ch, ΓWORD.get(ch), src[i + 1], sourceStart);
       γadvance(ctx.src, ch);
       i += 1;
       continue;
     }
 
-    if (ΓNUM.has(ch)) {
+    if (ΓNUM.has(ch) && !inIdent) {
       γemitNum(ctx, ch, ΓNUM.get(ch), src[i + 1], sourceStart);
       γadvance(ctx.src, ch);
       i += 1;
@@ -459,6 +584,11 @@ export function γlint(source, opts = {}) {
     if (/^\s*def\b/u.test(code)) warnings.push(`${path}:${n} mixed-style: use λ instead of def`);
     if (/^\s*return\b/u.test(code)) warnings.push(`${path}:${n} mixed-style: use ⊢ instead of return`);
     if (/\bprint\s*\(/u.test(code)) warnings.push(`${path}:${n} mixed-style: use ☉ instead of print`);
+    // Capability posture (GPY011): flag effects an agent/reviewer should see.
+    if (/\bsubprocess\b|\bos\.system\b|\bos\.exec\w*/u.test(code)) warnings.push(`${path}:${n} capability: process execution`);
+    if (/\burllib\b|\bsocket\b|\brequests\b|\bhttpx\b|\bHTTP\.get_text\b/u.test(code)) warnings.push(`${path}:${n} capability: network access`);
+    if (/\bopen\s*\([^)]*["'][wax]/u.test(code) || /\b(File|JSON|CSV)\.write\b/u.test(code)) warnings.push(`${path}:${n} capability: file write`);
+    if (/\beval\s*\(|\bexec\s*\(/u.test(code)) warnings.push(`${path}:${n} capability: dynamic code execution`);
   }
   return warnings;
 }

@@ -56,6 +56,11 @@ const CASES = [
     py: 'xs = [1, 2, 3, 4, 5]\nprint([(x * 10) for x in xs if x >= 3])\n',
   },
   {
+    name: '∴⎇ elif chains',
+    gpy: 'λ grade(ν):\n    ⎇ ν ≥ 90:\n        ⊢ "A"\n    ∴ ⎇ ν ≥ 80:\n        ⊢ "B"\n    ∴:\n        ⊢ "C"\n∀ χ ∈ [95, 85, 60]:\n    ☉(grade(χ))\n',
+    py: 'def grade(n):\n    if n >= 90:\n        return "A"\n    elif n >= 80:\n        return "B"\n    else:\n        return "C"\nfor x in [95, 85, 60]:\n    print(grade(x))\n',
+  },
+  {
     name: 'f-string expressions',
     gpy: 'ν ≔ 7\n☉(f"n={ν} double={ν × 2} pad={ν:>4}")\n',
     py: 'n = 7\nprint(f"n={n} double={n * 2} pad={n:>4}")\n',

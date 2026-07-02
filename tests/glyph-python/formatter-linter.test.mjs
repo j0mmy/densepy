@@ -79,5 +79,35 @@ function τ(name, fn) {
   }
 });
 
+τ('γlint flags capability usage: process, network, file write, dynamic code', () => {
+  const src = 'import subprocess\nsubprocess.run(["ls"])\nurllib.request.urlopen("http://x")\nopen("x.txt", "w")\neval("1+1")\n';
+  const warnings = γlint(src, { path: 'caps.gpy' });
+  const text = warnings.join('\n');
+  assert.match(text, /caps\.gpy:1 capability: process execution/);
+  assert.match(text, /caps\.gpy:3 capability: network access/);
+  assert.match(text, /caps\.gpy:4 capability: file write/);
+  assert.match(text, /caps\.gpy:5 capability: dynamic code execution/);
+});
+
+τ('Υ fmt and lint with no file process the whole project tree', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-proj-fmtlint-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'fl-tool']).status, 0);
+    writeFileSync(join(root, 'src', 'a.gpy'), 'χ≔Ⅰ\n☉(χ)\n');
+    writeFileSync(join(root, 'src', 'b.gpy'), 'def f():\n    return 1\n');
+
+    const fmt = ψ(['fmt'], { cwd: root });
+    assert.equal(fmt.status, 0, fmt.stderr + fmt.stdout);
+    assert.match(fmt.stdout, /fmt OK 3 files/);
+    assert.equal(readFileSync(join(root, 'src', 'a.gpy'), 'utf8'), 'χ ≔ Ⅰ\n☉(χ)\n');
+
+    const lint = ψ(['lint'], { cwd: root });
+    assert.notEqual(lint.status, 0);
+    assert.match(lint.stderr + lint.stdout, /b\.gpy:1 mixed-style: use λ instead of def/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy formatter/linter tests: 4 passed, 0 failed');
+console.log('\nγpy formatter/linter tests: 6 passed, 0 failed');
