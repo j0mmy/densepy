@@ -1,0 +1,17 @@
+node_modules/
+package-lock.json
+.DS_Store
+*.log
+coverage/
+.nyc_output/
+build/
+dist/
+tmp/
+temp/
+*.tmp
+.env
+.env.*
+!.env.example
+.pytest_cache/
+__pycache__/
+*.pyc

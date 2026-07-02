@@ -1,0 +1,21 @@
+{
+  "name": "glyphpython",
+  "version": "0.1.0",
+  "description": "Python-backed glyph syntax compiler and CLI: .gpy to executable Python.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "gpy": "./bin/gpy.mjs"
+  },
+  "scripts": {
+    "test": "node tests/glyph-python/token-aliases.test.mjs && node tests/glyph-python/cli.test.mjs && node tests/glyph-python/source-map.test.mjs && node tests/glyph-python/diagnostics.test.mjs && node tests/glyph-python/macros.test.mjs && node tests/glyph-python/stdlib-facades.test.mjs && node tests/glyph-python/project-workflow.test.mjs && node tests/glyph-python/formatter-linter.test.mjs",
+    "gpy": "node bin/gpy.mjs",
+    "check": "npm test"
+  },
+  "engines": {
+    "node": ">=20",
+    "python": ">=3.11"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
