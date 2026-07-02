@@ -1,7 +1,7 @@
 {
   "name": "glyphpython",
-  "version": "0.4.0",
-  "description": "Python-backed glyph syntax compiler and CLI: .gpy to executable Python.",
+  "version": "0.5.0",
+  "description": "DensePy: a token-minimized, agents-only language that compiles to Python.",
   "type": "module",
   "private": true,
   "bin": {

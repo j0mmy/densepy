@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, basename, relative, dirname } from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γlint, γprelude } from '../src/glyph-python/γpy.mjs';
+import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γdense, γlint, γprelude } from '../src/glyph-python/γpy.mjs';
 import { γlspServe } from '../src/glyph-python/lsp.mjs';
 
 function Ωusage() {
@@ -279,7 +279,9 @@ function ΩprojectFiles() {
 
 function ΩcmdFmt(argv) {
   const checkOnly = argv.includes('--check');
-  const file = argv.find((x, i) => i > 0 && x !== '--check');
+  const denseMode = argv.includes('--dense');
+  const φfmt = denseMode ? γdense : γformat;
+  const file = argv.find((x, i) => i > 0 && !x.startsWith('--'));
   if (!file) {
     let files;
     try {
@@ -291,7 +293,7 @@ function ΩcmdFmt(argv) {
     let changed = 0;
     for (const path of files) {
       const src = readFileSync(path, 'utf8');
-      const formatted = γformat(src);
+      const formatted = φfmt(src);
       if (formatted === src) continue;
       changed += 1;
       if (checkOnly) process.stderr.write(`fmt would change ${relative(process.cwd(), path)}\n`);
@@ -302,7 +304,7 @@ function ΩcmdFmt(argv) {
     return 0;
   }
   const src = readFileSync(file, 'utf8');
-  const formatted = γformat(src);
+  const formatted = φfmt(src);
   if (checkOnly) {
     if (formatted !== src) {
       process.stderr.write(`fmt would change ${file}\n`);

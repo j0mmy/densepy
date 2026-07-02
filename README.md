@@ -1,12 +1,26 @@
-# GlyphPython
+# DensePy
 
-GlyphPython is a small Python-backed glyph syntax compiler and CLI.
+DensePy is a programming language made **only for agents** — not
+human-optimized in any way. It is Python-backed: a token-minimized
+authoring surface that compiles to ordinary Python, keeping the entire
+Python ecosystem.
 
 ```text
-.gpy source -> GlyphPython compiler -> ordinary .py -> python3
+.gpy source -> DensePy compiler -> ordinary .py -> python3
 ```
 
-The goal is practical language tooling: compile, run, check, test, format, lint, and package `.gpy` projects while keeping Python's runtime and ecosystem intact.
+Measured on o200k_base BPE: the dense surface costs **0.84×** the tokens
+of equivalent Python (canonical `fmt --dense` style ≈0.74× on
+block-structured code). Every spelling in the language was chosen by
+tokenizer measurement, and forms that lost (pipeline `|>`, glyph
+keywords) were rejected or demoted.
+
+**Agents: load `docs/AGENT_PACKET.md` (574 tokens) into context to write
+DensePy correctly first try.**
+
+The project began as GlyphPython; the glyph surface (λ, ⎇, Σ…) still
+compiles but costs 1.35× Python tokens and is now legacy. The CLI remains
+`gpy` and sources remain `.gpy`.
 
 ## Install
 

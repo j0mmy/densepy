@@ -658,6 +658,98 @@ export function γformat(source) {
     .replace(/\n*$/u, '\n');
 }
 
+// Token-minimizing canonical form ("DensePy fmt"). Semantics-preserving:
+// strings/comments/continuation lines untouched. Three transforms, each
+// measured on o200k_base (see scripts/density.gpy): tight intra-line
+// spacing, 1-space indents, single-statement block collapse, blank strip.
+const ΓCOMPOUND_START = /^(if|elif|else|for|while|def|class|with|try|except|finally|match|case|async|fn|@|λ|⎇|∴|↻|∀)/u;
+
+function γdenseLines(src) {
+  const recs = [];
+  let lineStart = 0;
+  let lineDepth = 0;
+  let lineInString = false;
+  let d = 0;
+  let i = 0;
+  const endLine = (endIdx, nextInString) => {
+    recs.push({ start: lineStart, end: endIdx, depth: lineDepth, inString: lineInString });
+    lineStart = endIdx + 1;
+    lineDepth = d;
+    lineInString = nextInString;
+  };
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '\n') { endLine(i, false); i += 1; continue; }
+    if (ch === '#') {
+      const j = src.indexOf('\n', i);
+      if (j === -1) { i = src.length; break; }
+      i = j;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const j = γscanStringEnd(src, i);
+      let k = src.indexOf('\n', i);
+      while (k !== -1 && k < j) { endLine(k, true); k = src.indexOf('\n', k + 1); }
+      i = j;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') d += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') d = Math.max(0, d - 1);
+    i += 1;
+  }
+  if (lineStart < src.length) recs.push({ start: lineStart, end: src.length, depth: lineDepth, inString: lineInString });
+  return recs;
+}
+
+export function γdense(source) {
+  const tightened = γrewriteCodeOnly(String(source), (code) => code.replace(/ +/g, (m, off, s) => {
+    const a = s[off - 1];
+    const b = s[off + m.length];
+    if (!a || a === '\n') return m;
+    if (!b || b === '\n') return '';
+    return γid(a) && γid(b) ? ' ' : '';
+  }));
+
+  const lines = [];
+  for (const rec of γdenseLines(tightened)) {
+    let text = tightened.slice(rec.start, rec.end);
+    if (rec.inString || rec.depth > 0) {
+      lines.push({ text, protected: true });
+      continue;
+    }
+    if (/^\s*$/.test(text)) continue;
+    const indent = text.match(/^( +)/);
+    if (indent && indent[1].length % 4 === 0) {
+      text = ' '.repeat(indent[1].length / 4) + text.slice(indent[1].length);
+    }
+    lines.push({ text, protected: false });
+  }
+
+  const γindentOf = (t) => (t.match(/^ */) ?? [''])[0].length;
+  const out = [];
+  for (let n = 0; n < lines.length; n += 1) {
+    const line = lines[n];
+    const next = lines[n + 1];
+    const after = lines[n + 2];
+    if (
+      !line.protected && next && !next.protected
+      && line.text.trimEnd().endsWith(':') && !line.text.includes('#')
+      && γindentOf(next.text) > γindentOf(line.text)
+      && !next.text.trimEnd().endsWith(':') && !next.text.includes('#')
+      && !ΓCOMPOUND_START.test(next.text.trimStart())
+      && (!after || after.protected === false)
+      && (!after || γindentOf(after.text) <= γindentOf(line.text))
+    ) {
+      out.push(`${line.text.trimEnd()}${next.text.trim()}`);
+      n += 1;
+      continue;
+    }
+    out.push(line.text);
+  }
+  const joined = out.join('\n');
+  return joined.endsWith('\n') ? joined : `${joined}\n`;
+}
+
 export function γlint(source, opts = {}) {
   const path = opts.path ?? '<source>';
   const warnings = [];

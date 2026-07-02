@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { γcompile, γrun } from '../../src/glyph-python/γpy.mjs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { γcompile, γrun, γdense } from '../../src/glyph-python/γpy.mjs';
 
 function τ(name, fn) {
   try {
@@ -49,5 +53,45 @@ function τ(name, fn) {
   assert.deepEqual(r.stdout.trim().split('\n'), ['3', '8']);
 });
 
+τ('γdense minimizes tokens while preserving semantics and staying idempotent', () => {
+  const src = 'def grade(n):\n    if n >= 90:\n        return "A"\n    elif n >= 80:\n        return "B"\n    else:\n        return "C"\n\n\nfor x in [95, 85, 60]:\n    print(grade(x))\n';
+  const dense = γdense(src);
+  assert.equal(dense, 'def grade(n):\n if n>=90:return"A"\n elif n>=80:return"B"\n else:return"C"\nfor x in[95,85,60]:print(grade(x))\n');
+  assert.equal(γdense(dense), dense);
+  const a = γrun(src);
+  const b = γrun(dense);
+  assert.equal(b.status, 0, b.stderr + '\n' + dense);
+  assert.equal(a.stdout, b.stdout);
+});
+
+τ('γdense protects strings, comments, and bracket-continuation lines', () => {
+  const src = 'text = """keep  spaces\n\n    and indent"""\nx = 1  # keep comment\nys = [\n    1,\n    2,\n]\nprint(text[:4], x, ys)\n';
+  const dense = γdense(src);
+  assert.match(dense, /keep  spaces\n\n    and indent/);
+  assert.match(dense, /# keep comment/);
+  const a = γrun(src);
+  const b = γrun(dense);
+  assert.equal(b.status, 0, b.stderr + '\n' + dense);
+  assert.equal(a.stdout, b.stdout);
+});
+
+τ('Υ fmt --dense densifies files and is idempotent', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-fmt-dense-'));
+  try {
+    const ρ = new URL('../..', import.meta.url).pathname;
+    const file = join(root, 'app.gpy');
+    writeFileSync(file, 'fn f(n) = n * 2\nif f(2) >= 4:\n    print("ok")\n');
+    const r = spawnSync(process.execPath, [join(ρ, 'bin/gpy.mjs'), 'fmt', '--dense', file], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    const once = readFileSync(file, 'utf8');
+    assert.equal(once, 'fn f(n)=n*2\nif f(2)>=4:print("ok")\n');
+    const again = spawnSync(process.execPath, [join(ρ, 'bin/gpy.mjs'), 'fmt', '--dense', file], { encoding: 'utf8' });
+    assert.equal(again.status, 0, again.stderr + again.stdout);
+    assert.equal(readFileSync(file, 'utf8'), once);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy dense surface tests: 5 passed, 0 failed');
+console.log('\nγpy dense surface tests: 8 passed, 0 failed');

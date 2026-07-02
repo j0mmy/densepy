@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 — 2026-07-02
+
+DensePy: agents-only rebrand + token-minimizing canonical form.
+
+- Renamed to DensePy: a language made only for agents, not
+  human-optimized. Glyph surface demoted to legacy (still compiles).
+- `gpy fmt --dense`: semantics-preserving token minimizer — tight
+  spacing (space survives only between identifier chars), 1-space
+  indents, single-statement block collapse (`if x>0:return x`), blank
+  lines stripped; strings/comments/continuation lines untouched;
+  idempotent. Grade fixture: 54 → 40 tokens (−26%).
+- docs/AGENT_PACKET.md: 574-token context packet that teaches an agent
+  the whole language; README repositioned around measured numbers.
+
 ## 0.4.0 — 2026-07-02
 
 Dense ASCII surface: token economy delivered.
