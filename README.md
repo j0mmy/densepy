@@ -28,7 +28,7 @@ From a fresh checkout (requires Node >= 20 and Python >= 3.11):
 
 ```bash
 npm link        # makes `gpy` available on PATH
-gpy --version   # gpy 0.6.1
+gpy --version   # gpy 0.6.3
 ```
 
 Or run without installing: `node bin/gpy.mjs <command>`.

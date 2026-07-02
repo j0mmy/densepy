@@ -1,6 +1,6 @@
 {
   "name": "densepy",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "DensePy: a token-minimized, agents-only language that compiles to Python.",
   "type": "module",
   "private": true,

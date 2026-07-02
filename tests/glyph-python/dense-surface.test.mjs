@@ -53,6 +53,13 @@ function τ(name, fn) {
   assert.deepEqual(r.stdout.trim().split('\n'), ['3', '8']);
 });
 
+τ('dense aggregates inside compound-statement headers stop at the colon', () => {
+  const src = 'xs=[1,2,3]\nif all[x:xs]x>0:print("all-pos")\nwhile sum[x:xs]x>100:break\nok="yes" if(any[x:xs]x==2)else"no"\nprint(ok)\n';
+  const r = γrun(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.stdout.trim().split('\n'), ['all-pos', 'yes']);
+});
+
 τ('γdense minimizes tokens while preserving semantics and staying idempotent', () => {
   const src = 'def grade(n):\n    if n >= 90:\n        return "A"\n    elif n >= 80:\n        return "B"\n    else:\n        return "C"\n\n\nfor x in [95, 85, 60]:\n    print(grade(x))\n';
   const dense = γdense(src);
@@ -94,4 +101,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy dense surface tests: 8 passed, 0 failed');
+console.log('\nγpy dense surface tests: 9 passed, 0 failed');

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.3 — 2026-07-02
+
+- Fix: aggregate bodies stop at a top-level `:` — `if all[x:xs]x>0:...`
+  compiles. Found by the compound chess-engine benchmark (the DensePy
+  agent's mate-2 search used exactly this form; 0/8 -> 8/8 after fix).
+  Parenthesize aggregates used mid-ternary.
+
 ## 0.6.1 — 2026-07-02
 
 - Fix: `gpy run` now forwards stdin to the program (file and project

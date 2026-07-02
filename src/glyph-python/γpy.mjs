@@ -283,11 +283,14 @@ function γtopIndex(text, needle) {
 }
 
 function γbodyEnd(src, i) {
+  // Top-level ':' ends the body so aggregates work inside compound-statement
+  // headers (`if all[x:xs]x>0:...`); a bare top-level lambda in a body is the
+  // one construct this forgoes (parenthesize it).
   let depth = 0;
   while (i < src.length) {
     const ch = src[i];
     if (ch === '"' || ch === "'") { i = γscanStringEnd(src, i); continue; }
-    if (depth === 0 && (ch === '\n' || ch === ',' || ch === '#')) return i;
+    if (depth === 0 && (ch === '\n' || ch === ',' || ch === '#' || ch === ':')) return i;
     if (ch === '(' || ch === '[' || ch === '{') depth += 1;
     else if (ch === ')' || ch === ']' || ch === '}') {
       if (depth === 0) return i;

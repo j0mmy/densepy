@@ -30,6 +30,9 @@ any[v:iter] body / all[v:iter] body
 - `fn` lowers only at statement start followed by `name(`.
 - First top-level `|` in the header splits iter|guard — parenthesize
   bitwise-or in iterables.
+- Aggregate bodies end at a top-level newline, `,`, `:`, or closer — so
+  they work in `if`/`while` headers. Parenthesize an aggregate used
+  mid-ternary: `"y" if(any[x:xs]x==2)else"n"`.
 - Strings/comments/f-string literal text are never rewritten; glyph forms
   (λ ⎇ ∴ ↻ ∀ ∈ ⊢ ☉ Σ Π π ≔ ≅ ≤ ≥ × ÷ −, ∴⎇=elif) also compile but cost
   MORE tokens — prefer dense ASCII.
