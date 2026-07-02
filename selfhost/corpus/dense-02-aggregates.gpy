@@ -1,0 +1,7 @@
+rows = [{"s": 5}, {"s": 12}, {"s": 8}]
+total = sum[r:rows] int(r["s"])
+hi = sel[r:rows|r["s"] >= 8] r["s"]
+p = prod[x:[2, 3, 4]] x
+ok = all[x:[1, 2]] x > 0
+none_neg = any[x:[1, 2]] x < 0
+print(total, hi, p, ok, none_neg)

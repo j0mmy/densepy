@@ -1,0 +1,9 @@
+text = """keep  spaces
+
+    and indent"""
+x = 1  # keep comment
+ys = [
+    1,
+    2,
+]
+print(text[:4], x, ys)

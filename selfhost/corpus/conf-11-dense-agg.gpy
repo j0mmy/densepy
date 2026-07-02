@@ -1,0 +1,2 @@
+xs = [1, 2, 3, 4, 5]
+print(sum[x:xs|x%2==0] x*x, prod[x:xs] x, sel[x:xs|x>3] x)

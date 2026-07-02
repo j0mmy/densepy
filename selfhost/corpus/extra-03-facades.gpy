@@ -1,0 +1,5 @@
+File.write("t.txt", "hi")
+☉(File.read("t.txt"))
+☉(JSON.dumps({"a": 1}))
+☉(Ρθ.join("x", "y"))
+☉(Ρθ.exists("t.txt"))

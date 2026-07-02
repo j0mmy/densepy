@@ -1,0 +1,5 @@
+def grade(n):
+ if n>=90:return"A"
+ elif n>=80:return"B"
+ else:return"C"
+for x in[95,85,60]:print(grade(x))

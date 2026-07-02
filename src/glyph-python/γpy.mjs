@@ -753,26 +753,55 @@ export function γdense(source) {
   return joined.endsWith('\n') ? joined : `${joined}\n`;
 }
 
+function γblankStrings(source) {
+  // Replace string-literal contents with spaces (newlines kept, so line
+  // numbers survive). Lint rules then cannot fire on text inside strings,
+  // and the per-line comment stripper cannot be fooled by '#' in a string.
+  const src = String(source);
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'") {
+      const j = γscanStringEnd(src, i);
+      out += src.slice(i, j).replace(/[^\n]/gu, ' ');
+      i = j;
+      continue;
+    }
+    if (ch === '#') {
+      const j = src.indexOf('\n', i);
+      const end = j === -1 ? src.length : j;
+      out += src.slice(i, end);
+      i = end;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
 export function γlint(source, opts = {}) {
   const path = opts.path ?? '<source>';
   const warnings = [];
-  const lines = String(source).split('\n');
+  const rawLines = String(source).split('\n');
+  const lines = γblankStrings(String(source)).split('\n');
   for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
+    const code = lines[i].replace(/#.*$/u, '');
+    const raw = rawLines[i] ?? '';
     const n = i + 1;
-    const trimmed = line.trim();
+    const trimmed = code.trim();
     const importMatch = trimmed.match(/^import\s+([^\s,]+)/) ?? trimmed.match(/^from\s+([^\s]+)\s+import\b/);
     if (importMatch && /[^\x00-\x7F]/u.test(importMatch[1])) {
       warnings.push(`${path}:${n} host-boundary: import module names must stay ASCII (${importMatch[1]})`);
     }
-    const code = γrewriteCodeOnly(line, (x) => x.replace(/#.*$/u, ''));
     // Dense canon enforcement: agents that fall back to `def` get a lint
     // signal their repair loop must clear (adoption by toolchain, not trust).
     if (/^\s*def\b/u.test(code)) warnings.push(`${path}:${n} style: use fn instead of def (dense canon)`);
     // Capability posture (GPY011): flag effects an agent/reviewer should see.
     if (/\bsubprocess\b|\bos\.system\b|\bos\.exec\w*/u.test(code)) warnings.push(`${path}:${n} capability: process execution`);
     if (/\burllib\b|\bsocket\b|\brequests\b|\bhttpx\b|\bHTTP\.get_text\b/u.test(code)) warnings.push(`${path}:${n} capability: network access`);
-    if (/\bopen\s*\([^)]*["'][wax]/u.test(code) || /\b(File|JSON|CSV)\.write\b/u.test(code)) warnings.push(`${path}:${n} capability: file write`);
+    if ((/\bopen\s*\(/u.test(code) && /\bopen\s*\([^)]*["'][wax]/u.test(raw)) || /\b(File|JSON|CSV)\.write\b/u.test(code)) warnings.push(`${path}:${n} capability: file write`);
     if (/\beval\s*\(|\bexec\s*\(/u.test(code)) warnings.push(`${path}:${n} capability: dynamic code execution`);
   }
   return warnings;

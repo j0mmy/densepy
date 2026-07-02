@@ -1,0 +1,298 @@
+# selfhost: DensePy compiler (.gpy -> python), port of src/glyph-python/γpy.mjs
+# usage: python3 γpy.py file.gpy  (compiled python on stdout)
+import re,sys
+W={'λ':'def','⎇':'if','∴':'else','↻':'while','∀':'for','∈':'in','⊢':'return','☉':'print','⊤':'True','⊥':'False','∅':'None','∧':'and','∨':'or','¬':'not'}
+O={'≔':'=','≅':'==','≠':'!=','≤':'<=','≥':'>=','×':'*','÷':'/','−':'-'}
+NU={'Ⅰ':'1','Ⅱ':'2','Ⅲ':'3','Ⅳ':'4','Ⅴ':'5','Ⅵ':'6','Ⅶ':'7','Ⅷ':'8','Ⅸ':'9','Ⅹ':'10','Ⅺ':'11','Ⅻ':'12'}
+SN=['File','JSON','Path','HTTP','CSV','Table','Ρθ','Πδ']
+AGG=('sum','prod','sel','any','all')
+P="import csv as _γ_csv, json as _γ_json, os as _γ_os, urllib.request as _γ_urlreq\nfrom pathlib import Path as _γ_Path\nclass File:\n    @staticmethod\n    def read(path, encoding='utf-8'):\n        return _γ_Path(path).read_text(encoding=encoding)\n    @staticmethod\n    def write(path, data, encoding='utf-8'):\n        _γ_Path(path).write_text(str(data), encoding=encoding)\n        return path\nclass JSON:\n    @staticmethod\n    def loads(text):\n        return _γ_json.loads(text)\n    @staticmethod\n    def dumps(value, **kwargs):\n        return _γ_json.dumps(value, **kwargs)\n    @staticmethod\n    def read(path, encoding='utf-8'):\n        return _γ_json.loads(File.read(path, encoding=encoding))\n    @staticmethod\n    def write(path, value, encoding='utf-8', **kwargs):\n        File.write(path, _γ_json.dumps(value, **kwargs), encoding=encoding)\n        return path\nclass Path:\n    @staticmethod\n    def join(*parts):\n        return str(_γ_Path(*parts))\n    @staticmethod\n    def exists(path):\n        return _γ_Path(path).exists()\n    @staticmethod\n    def name(path):\n        return _γ_Path(path).name\nclass HTTP:\n    @staticmethod\n    def get_text(url, encoding='utf-8'):\n        with _γ_urlreq.urlopen(url) as r:\n            return r.read().decode(encoding)\nclass CSV:\n    @staticmethod\n    def read(path, encoding='utf-8'):\n        with open(path, newline='', encoding=encoding) as f:\n            return list(_γ_csv.DictReader(f))\n    @staticmethod\n    def write(path, rows, fieldnames=None, encoding='utf-8'):\n        rows = list(rows)\n        if fieldnames is None:\n            fieldnames = list(rows[0].keys()) if rows else []\n        with open(path, 'w', newline='', encoding=encoding) as f:\n            w = _γ_csv.DictWriter(f, fieldnames=fieldnames)\n            w.writeheader()\n            w.writerows(rows)\n        return path\nclass Table:\n    @staticmethod\n    def require():\n        try:\n            import pandas as _γ_pd\n            return _γ_pd\n        except ImportError:\n            raise ImportError('GlyphPython Table facade requires pandas: pip install pandas') from None\n    @staticmethod\n    def read_csv(path, **kwargs):\n        return Table.require().read_csv(path, **kwargs)\nΡθ = Path\nΠδ = Table\n"
+fn at(s,i)=s[i] if 0<=i<len(s) else''
+fn gid(c)=c!=''and(c=='_'or c.isalpha()or c.isnumeric())
+fn hasid(s)=any[c:s]gid(c)
+fn hasws(s)=any[c:s]c.isspace()
+fn is_ident(s):
+ if s==''or not(s[0]=='_'or s[0].isalpha()):return False
+ return all[c:s]gid(c)
+fn scan_str_end(s,i):
+ q=s[i];n=len(s);t=s[i:i+3]==q*3
+ i+=3 if t else 1
+ while i<n:
+  if not t and s[i]=='\\':i+=2;continue
+  if t and s[i:i+3]==q*3:return i+3
+  if not t and s[i]==q:return i+1
+  i+=1
+ return i
+fn match_paren(s,i):
+ d=0;n=len(s)
+ while i<n:
+  c=s[i]
+  if c=='"'or c=="'":i=scan_str_end(s,i);continue
+  if c in'([{':d+=1
+  elif c in')]}':
+   d-=1
+   if d==0:return i
+  i+=1
+ return-1
+fn top_index(s,w):
+ d=0;i=0;n=len(s)
+ while i<n:
+  c=s[i]
+  if c=='"'or c=="'":i=scan_str_end(s,i);continue
+  if c in'([{':d+=1
+  elif c in')]}':d-=1
+  elif d==0 and c==w:return i
+  i+=1
+ return-1
+fn body_end(s,i):
+ d=0;n=len(s)
+ while i<n:
+  c=s[i]
+  if c=='"'or c=="'":i=scan_str_end(s,i);continue
+  if d==0 and(c=='\n'or c==','or c=='#'or c==':'):return i
+  if c in'([{':d+=1
+  elif c in')]}':
+   if d==0:return i
+   d-=1
+  i+=1
+ return i
+fn f_prefix(s,i):
+ j=i-1;p=''
+ while j>=0 and len(p)<3 and('a'<=s[j]<='z'or'A'<=s[j]<='Z'):p=s[j]+p;j-=1
+ if p==''or len(p)>2:return False
+ if j>=0 and gid(s[j]):return False
+ return('f'in p or'F'in p)and all[c:p]c in'fFrRbBuU'
+fn map_expr(c):
+ if c in W:return' '+W[c]+' '
+ if c in NU:return' '+NU[c]+' '
+ if c in O:return' '+O[c]+' '
+ return None
+fn fstring_text(s,i):
+ q=s[i];n=len(s);t=s[i:i+3]==q*3
+ z=q*3 if t else q
+ b=i
+ i+=3 if t else 1
+ o=s[b:i];fr=[]
+ while i<n:
+  c=s[i]
+  if len(fr)==0:
+   if t and s[i:i+3]==z:o+=z;i+=3;break
+   if not t and c==q:o+=c;i+=1;break
+   if not t and c=='\\':o+=s[i:i+2];i+=2;continue
+   if c=='{'and at(s,i+1)=='{':o+='{{';i+=2;continue
+   if c=='}'and at(s,i+1)=='}':o+='}}';i+=2;continue
+   if c=='{':fr.append(False);o+=c;i+=1;continue
+   o+=c;i+=1;continue
+  if c=='{':fr.append(False);o+=c;i+=1;continue
+  if c=='}':fr.pop();o+=c;i+=1;continue
+  if c==':'and not fr[-1]:fr[-1]=True;o+=c;i+=1;continue
+  if not fr[-1]and(c=='"'or c=="'"):
+   if f_prefix(s,i):
+    r=fstring_text(s,i)
+    o+=r[0];i=r[1];continue
+   nq=c;j=i+1
+   while j<n:
+    if s[j]=='\\':j+=2;continue
+    if s[j]==nq:j+=1;break
+    j+=1
+   o+=s[i:j];i=j;continue
+  if not fr[-1]and not(gid(c)and gid(at(s,i-1))):
+   m=map_expr(c)
+   if m is not None:o+=m;i+=1;continue
+  o+=c;i+=1
+ return o,i
+fn stmt_start(o):
+ i=len(o)-1
+ while i>=0:
+  c=o[i]
+  if c==' 'or c=='\t':i-=1;continue
+  return c=='\n'
+ return True
+fn parse_fn(s,i):
+ j=i+2;n=len(s)
+ if at(s,j)!=' 'and at(s,j)!='\t':return None
+ while at(s,j)==' 'or at(s,j)=='\t':j+=1
+ nm=''
+ while j<n and gid(s[j]):nm+=s[j];j+=1
+ if nm==''or not is_ident(nm):return None
+ while at(s,j)==' ':j+=1
+ if at(s,j)!='(':return None
+ c=match_paren(s,j)
+ if c<0:return None
+ ps=expand_core(s[j+1:c])
+ k=c+1
+ while at(s,k)==' 'or at(s,k)=='\t':k+=1
+ if at(s,k)=='='and at(s,k+1)!='=':
+  e=k+1
+  while at(s,e)==' 'or at(s,e)=='\t':e+=1
+  return'def '+nm+'('+ps+'): return ',e
+ if at(s,k)==':':return'def '+nm+'('+ps+')',c+1
+ return None
+fn parse_glyph(s,i):
+ k=s[i];j=i+1
+ while at(s,j)==' ':j+=1
+ if at(s,j)!='(':return None
+ c=match_paren(s,j)
+ if c<0:return None
+ h=s[j+1:c]
+ a=top_index(h,'∈')
+ if a<0:return None
+ v=h[:a].strip()
+ if not is_ident(v):return None
+ r=h[a+1:]
+ b=top_index(r,'|')
+ it=(r if b<0 else r[:b]).strip()
+ g=''if b<0 else r[b+1:].strip()
+ if it=='':return None
+ m=c+1
+ while at(s,m)==' 'or at(s,m)=='\t':m+=1
+ z=body_end(s,m)
+ bd=s[m:z].strip()
+ if bd=='':return None
+ B=expand_core(bd);I=expand_core(it)
+ G=(' if '+expand_core(g))if g!=''else''
+ if k=='Σ':return'sum(('+B+') for '+v+' in '+I+G+')',z
+ if k=='Π':return'math.prod(('+B+') for '+v+' in '+I+G+')',z
+ return'[('+B+') for '+v+' in '+I+G+']',z
+fn parse_comp(s,i):
+ c=match_paren(s,i)
+ if c<0:return None
+ h=s[i+1:c]
+ if'∘'not in h:return None
+ ns=sel[x:h.split('∘')]x.strip()
+ if len(ns)<2 or not all[x:ns]is_ident(x):return None
+ k=c+1
+ while at(s,k)==' ':k+=1
+ if at(s,k)!='(':return None
+ a=match_paren(s,k)
+ if a<0:return None
+ args=expand_core(s[k+1:a])
+ call=ns[-1]+'('+args+')'
+ for x in reversed(ns[:-1]):call=x+'('+call+')'
+ return call,a+1
+fn parse_ascii(s,i,w):
+ op=i+len(w)
+ if at(s,op)!='[':return None
+ c=match_paren(s,op)
+ if c<0:return None
+ h=s[op+1:c]
+ a=top_index(h,':')
+ if a<0:return None
+ v=h[:a].strip()
+ if not is_ident(v):return None
+ r=h[a+1:]
+ b=top_index(r,'|')
+ it=(r if b<0 else r[:b]).strip()
+ g=''if b<0 else r[b+1:].strip()
+ if it=='':return None
+ k=c+1
+ while at(s,k)==' 'or at(s,k)=='\t':k+=1
+ x=at(s,k)
+ if x==''or not(gid(x)or x in'"\'([{¬−+-'):return None
+ z=body_end(s,k)
+ bd=s[k:z].strip()
+ if bd=='':return None
+ G=(' if '+expand_core(g))if g!=''else''
+ B=expand_core(bd);I=expand_core(it)
+ if w=='sum':return'sum(('+B+') for '+v+' in '+I+G+')',z
+ if w=='prod':return'math.prod(('+B+') for '+v+' in '+I+G+')',z
+ if w=='sel':return'[('+B+') for '+v+' in '+I+G+']',z
+ if w=='any':return'any(('+B+') for '+v+' in '+I+G+')',z
+ return'all(('+B+') for '+v+' in '+I+G+')',z
+fn expand_core(s):
+ o='';i=0;n=len(s)
+ while i<n:
+  c=s[i]
+  if c=='#':
+   j=s.find('\n',i)
+   if j<0:return o+s[i:]
+   o+=s[i:j];i=j;continue
+  if c=='"'or c=="'":
+   j=scan_str_end(s,i);o+=s[i:j];i=j;continue
+  p=o[-1] if o else''
+  if(c=='_'or'a'<=c<='z'or'A'<=c<='Z')and not gid(p):
+   w=c;j=i+1
+   while j<n and(s[j]=='_'or(s[j].isascii()and s[j].isalnum())):w+=s[j];j+=1
+   if w=='fn'and not gid(at(s,j))and stmt_start(o):
+    r=parse_fn(s,i)
+    if r is not None:o+=r[0];i=r[1];continue
+   if w in AGG and not gid(at(s,j)):
+    r=parse_ascii(s,i,w)
+    if r is not None:o+=r[0];i=r[1];continue
+   o+=w;i=j;continue
+  if(c=='Σ'or c=='Π'or c=='π')and not gid(p):
+   r=parse_glyph(s,i)
+   if r is not None:o+=r[0];i=r[1];continue
+  if c=='('and not gid(p):
+   r=parse_comp(s,i)
+   if r is not None:o+=r[0];i=r[1];continue
+  o+=c;i+=1
+ return o
+fn expand_macros(s):
+ z=expand_core(s)
+ if'math.prod('in z and re.search(r'^\s*import\s+math\b',z,re.M)is None:return'import math\n'+z
+ return z
+fn code_only(s):
+ o='';i=0;n=len(s)
+ while i<n:
+  c=s[i]
+  if c=='#':
+   j=s.find('\n',i)
+   if j<0:return o
+   i=j;continue
+  if c=='"'or c=="'":i=scan_str_end(s,i);continue
+  o+=c;i+=1
+ return o
+fn uses_std(s):
+ z=code_only(s)
+ return any[x:SN]x in z
+fn emit_word(o,w,nx):
+ p=o[-1] if o else''
+ if hasid(p):o.append(' ')
+ o.append(w)
+ if gid(nx):o.append(' ')
+fn emit_op(o,w):
+ p=o[-1] if o else''
+ if p!=''and not hasws(p):o.append(' ')
+ o.append(w)
+ o.append(' ')
+fn compile_src(s):
+ z=expand_macros(s)
+ s=(P+z)if uses_std(z)else z
+ o=[];i=0;n=len(s)
+ while i<n:
+  c=s[i]
+  if c=='#':
+   j=s.find('\n',i)
+   t=s[i:] if j<0 else s[i:j]
+   o.append(t);i+=len(t)
+   if j<0:break
+   continue
+  if c=='"'or c=="'":
+   if f_prefix(s,i):
+    r=fstring_text(s,i)
+    o.append(r[0]);i=r[1]
+   else:
+    j=scan_str_end(s,i);o.append(s[i:j]);i=j
+   continue
+  if c=='∴':
+   j=i+1
+   while at(s,j)==' 'or at(s,j)=='\t':j+=1
+   if at(s,j)=='⎇':
+    emit_word(o,'elif',at(s,j+1))
+    i=j+1;continue
+  inid=gid(c)and gid(at(s,i-1))
+  if c in W and not inid:
+   emit_word(o,W[c],at(s,i+1));i+=1;continue
+  if c in NU and not inid:
+   emit_word(o,NU[c],at(s,i+1));i+=1;continue
+  if c in O:
+   emit_op(o,O[c]);i+=1
+   while at(s,i)==' 'or at(s,i)=='\t':i+=1
+   continue
+  o.append(c);i+=1
+ return re.sub(r'[ \t]+\n','\n',''.join(o))
+fn main():
+ src=open(sys.argv[1],encoding='utf-8').read()
+ sys.stdout.write(compile_src(src))
+main()

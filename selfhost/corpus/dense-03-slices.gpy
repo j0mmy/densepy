@@ -1,0 +1,6 @@
+# adapted: original test asserts compiled text only; this variant is runnable
+sum = [1, 2, 3, 4]
+q = sum[1:3]
+s = "sum[x:xs] stays in strings"
+# sum[x:xs] stays in comments
+print(q, s)

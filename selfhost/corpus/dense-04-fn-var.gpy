@@ -1,0 +1,4 @@
+fn = 5
+print(fn)
+result = fn + 1
+print(result)
