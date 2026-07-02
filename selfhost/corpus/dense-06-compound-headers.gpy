@@ -1,0 +1,5 @@
+xs=[1,2,3]
+if all[x:xs]x>0:print("all-pos")
+while sum[x:xs]x>100:break
+ok="yes" if(any[x:xs]x==2)else"no"
+print(ok)

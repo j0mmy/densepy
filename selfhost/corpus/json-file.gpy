@@ -1,0 +1,6 @@
+# γpy keeps Python imports at the λ-boundary
+import json
+from pathlib import Path as Ρθ
+
+Δ ≔ json.loads(Ρθ("data.json").read_text())
+☉(Δ["name"] + ":" + str(Δ["score"]))

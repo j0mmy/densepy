@@ -1,0 +1,5 @@
+fn f(n) = 1 if n <= 1 else n * f(n - 1)
+print(f(6))
+fn g(x):
+    return x + 1
+print(g(1))
