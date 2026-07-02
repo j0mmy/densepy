@@ -42,6 +42,11 @@ gpy build / check [--types] / test / fmt --dense / lint / watch / repl / lsp
 gpy deps install|add|list|check    .venv + real installs
 ```
 
+## Canon is enforced
+
+`gpy lint` FAILS on `def` — always use `fn`. Falling back to plain-Python
+function style is a lint error your loop must clear, not a stylistic choice.
+
 ## Diagnostics: always pass --agent
 
 `check|run|lint --agent` emit one line per event (AXI-style; 12 tokens vs

@@ -57,12 +57,11 @@ function τ(name, fn) {
   }
 });
 
-τ('γlint warns on λ keywords in project-owned code when γ aliases exist', () => {
+τ('γlint enforces dense canon: def flagged, fn/return/print accepted', () => {
   const warnings = γlint('def f():\n    print("x")\n    return None\n', { path: 'bad.gpy' });
-  assert.equal(warnings.length, 3);
-  assert.match(warnings.join('\n'), /bad\.gpy:1 mixed-style: use λ instead of def/);
-  assert.match(warnings.join('\n'), /bad\.gpy:2 mixed-style: use ☉ instead of print/);
-  assert.match(warnings.join('\n'), /bad\.gpy:3 mixed-style: use ⊢ instead of return/);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /bad\.gpy:1 style: use fn instead of def \(dense canon\)/);
+  assert.deepEqual(γlint('fn f(x)=x*2\nprint(f(2))\n', { path: 'ok.gpy' }), []);
 });
 
 τ('Υ lint catches host-boundary glyph corruption in import module names', () => {
@@ -103,7 +102,7 @@ function τ(name, fn) {
 
     const lint = ψ(['lint'], { cwd: root });
     assert.notEqual(lint.status, 0);
-    assert.match(lint.stderr + lint.stdout, /b\.gpy:1 mixed-style: use λ instead of def/);
+    assert.match(lint.stderr + lint.stdout, /b\.gpy:1 style: use fn instead of def/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

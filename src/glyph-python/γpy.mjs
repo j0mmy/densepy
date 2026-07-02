@@ -763,9 +763,9 @@ export function γlint(source, opts = {}) {
       warnings.push(`${path}:${n} host-boundary: import module names must stay ASCII (${importMatch[1]})`);
     }
     const code = γrewriteCodeOnly(line, (x) => x.replace(/#.*$/u, ''));
-    if (/^\s*def\b/u.test(code)) warnings.push(`${path}:${n} mixed-style: use λ instead of def`);
-    if (/^\s*return\b/u.test(code)) warnings.push(`${path}:${n} mixed-style: use ⊢ instead of return`);
-    if (/\bprint\s*\(/u.test(code)) warnings.push(`${path}:${n} mixed-style: use ☉ instead of print`);
+    // Dense canon enforcement: agents that fall back to `def` get a lint
+    // signal their repair loop must clear (adoption by toolchain, not trust).
+    if (/^\s*def\b/u.test(code)) warnings.push(`${path}:${n} style: use fn instead of def (dense canon)`);
     // Capability posture (GPY011): flag effects an agent/reviewer should see.
     if (/\bsubprocess\b|\bos\.system\b|\bos\.exec\w*/u.test(code)) warnings.push(`${path}:${n} capability: process execution`);
     if (/\burllib\b|\bsocket\b|\brequests\b|\bhttpx\b|\bHTTP\.get_text\b/u.test(code)) warnings.push(`${path}:${n} capability: network access`);
