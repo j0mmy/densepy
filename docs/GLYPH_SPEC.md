@@ -1,4 +1,4 @@
-# GlyphPython Language Specification (v0.3)
+# GlyphPython Language Specification (v0.4)
 
 The canonical reference for writing correct `.gpy` first try. GlyphPython is
 a glyph authoring surface over Python: everything Python can do is available;
@@ -12,9 +12,41 @@ glyph source is ~10% fewer characters but **~1.35× more tokens** than
 equivalent Python, because BPE tokenizers split rare Unicode glyphs into
 multiple tokens while `def`/`return`/`if` are single tokens. Macro forms
 score best (Σ/π ≈ 1.10× — structural compression nearly offsets glyph cost).
-Claims of token savings on current tokenizers are therefore **false**; the
-value of the surface is its unambiguous, regular structure and the macro
-layer, not raw token economy.
+Claims of token savings on current tokenizers are therefore **false** for
+glyphs; the value of the glyph surface is its unambiguous, regular structure.
+
+**For token economy, use the dense ASCII surface (below): measured at
+0.84× Python tokens overall (prod 0.69×, sum 0.89×). Dense is the
+recommended authoring surface for agents; glyph mode remains available
+and both may coexist in one file.**
+
+## Dense ASCII surface (recommended for agents)
+
+Every spelling chosen by measured BPE token cost (`scripts/density.gpy`).
+
+```text
+fn name(args) = expr        -> def name(args): return expr
+fn name(args):              -> def name(args):        (block form)
+sum[v:iter|guard] body      -> sum((body) for v in iter if guard)
+prod[v:iter] body           -> math.prod(...)   # import math auto-injected
+sel[v:iter|guard] body      -> [(body) for v in iter if guard]
+any[v:iter] body            -> any((body) for v in iter)
+all[v:iter] body            -> all((body) for v in iter)
+```
+
+Rules:
+- Aggregates lower ONLY when a body expression follows the `]` — that
+  position is invalid Python after a subscript, so real slices/subscripts
+  (`sum[a:b]` with no body) are never rewritten. The header `v` must be a
+  simple identifier; `sum[1:3]` is always a slice.
+- `fn` lowers only at statement start followed by `name(` — a variable
+  named `fn` is untouched.
+- Guard `|` splits at the first top-level `|`; parenthesize a union type
+  or bitwise-or in the iterable.
+- Pipeline (`x |> f`) was measured and REJECTED: 8 tokens vs 6 for
+  `g(f(x))` — nested calls are already optimal.
+- Whitespace is significant to token cost: `x%2==0` is cheaper than
+  `x % 2 == 0`. Prefer tight spacing in dense code.
 
 ## Word glyphs
 

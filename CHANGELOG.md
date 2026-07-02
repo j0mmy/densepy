@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 — 2026-07-02
+
+Dense ASCII surface: token economy delivered.
+
+- New dense forms, every spelling chosen by measured BPE cost:
+  `fn name(args) = expr` (expression-bodied def), `fn name(args):` blocks,
+  and `sum[v:iter|guard] body` / `prod[...]` / `sel[...]` / `any[...]` /
+  `all[...]` aggregates.
+- Measured result (o200k_base): dense surface = **0.84× Python tokens**
+  overall (prod 0.69×), vs glyph surface 1.35×. Dense is now the
+  recommended agent-authoring surface; glyph mode coexists in the same file.
+- Unambiguity: aggregates lower only when a body expression follows `]`
+  (invalid Python after a subscript) — real slices/subscripts untouched;
+  `fn`-named variables untouched. Pipeline `|>` measured and rejected
+  (loses tokens to nested calls).
+- Grammar highlights dense keywords; spec gains a dense-surface section.
+
 ## 0.3.0 — 2026-07-02
 
 Language-completeness milestone driven by stress-testing.

@@ -12,6 +12,7 @@
     { "include": "#glyph-numerals" },
     { "include": "#numbers" },
     { "include": "#python-keywords" },
+    { "include": "#dense-keywords" },
     { "include": "#function-def" }
   ],
   "repository": {
@@ -72,6 +73,10 @@
     "python-keywords": {
       "match": "\\b(import|from|as|try|except|finally|raise|with|class|pass|break|continue|assert|yield|lambda|global|nonlocal|del|is|elif|def|return|if|else|while|for|in|and|or|not|True|False|None)\\b",
       "name": "keyword.other.python.gpy"
+    },
+    "dense-keywords": {
+      "match": "\\b(fn)\\b|\\b(sum|prod|sel|any|all)(?=\\[)",
+      "name": "support.function.dense.gpy"
     },
     "function-def": {
       "match": "(?<=λ\\s|def\\s)([\\p{L}_][\\p{L}\\p{N}_]*)",

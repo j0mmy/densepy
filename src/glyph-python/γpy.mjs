@@ -352,6 +352,80 @@ function γparseCompose(src, i) {
   return { lowered: call, end: argsClose + 1 };
 }
 
+// Dense ASCII aggregates: keyword[v:iter[|guard]] body — chosen by measured
+// BPE token cost (see scripts/density.gpy). Lowered only when a body
+// expression follows the closer, which is invalid Python after a subscript,
+// so real slices/subscripts (`sum[a:b]` with no body) are never touched.
+const ΓASCII_AGG = new Map(Object.entries({
+  sum: (B, V, I, G) => `sum((${B}) for ${V} in ${I}${G})`,
+  prod: (B, V, I, G) => `math.prod((${B}) for ${V} in ${I}${G})`,
+  sel: (B, V, I, G) => `[(${B}) for ${V} in ${I}${G}]`,
+  any: (B, V, I, G) => `any((${B}) for ${V} in ${I}${G})`,
+  all: (B, V, I, G) => `all((${B}) for ${V} in ${I}${G})`,
+}));
+
+const ΓEXPR_START = /[\p{L}\p{N}_"'([{¬−+-]/u;
+
+function γparseAsciiAgg(src, i, word) {
+  const open = i + word.length;
+  if (src[open] !== '[') return null;
+  const close = γmatchParen(src, open);
+  if (close === -1) return null;
+  const header = src.slice(open + 1, close);
+  const at = γtopIndex(header, ':');
+  if (at === -1) return null;
+  const varName = header.slice(0, at).trim();
+  if (!ΓIDENT.test(varName)) return null;
+  const rest = header.slice(at + 1);
+  const bar = γtopIndex(rest, '|');
+  const iter = (bar === -1 ? rest : rest.slice(0, bar)).trim();
+  const guard = bar === -1 ? null : rest.slice(bar + 1).trim();
+  if (!iter) return null;
+  let k = close + 1;
+  while (src[k] === ' ' || src[k] === '\t') k += 1;
+  if (!ΓEXPR_START.test(src[k] ?? '')) return null;
+  const end = γbodyEnd(src, k);
+  const body = src.slice(k, end).trim();
+  if (!body) return null;
+  const G = guard ? ` if ${γexpandCore(guard)}` : '';
+  const lowered = ΓASCII_AGG.get(word)(γexpandCore(body), varName, γexpandCore(iter), G);
+  return { lowered, end };
+}
+
+function γparseFn(src, i) {
+  let j = i + 2;
+  if (src[j] !== ' ' && src[j] !== '\t') return null;
+  while (src[j] === ' ' || src[j] === '\t') j += 1;
+  let name = '';
+  while (j < src.length && γid(src[j])) { name += src[j]; j += 1; }
+  if (!name || !ΓIDENT.test(name)) return null;
+  while (src[j] === ' ') j += 1;
+  if (src[j] !== '(') return null;
+  const close = γmatchParen(src, j);
+  if (close === -1) return null;
+  const params = γexpandCore(src.slice(j + 1, close));
+  let k = close + 1;
+  while (src[k] === ' ' || src[k] === '\t') k += 1;
+  if (src[k] === '=' && src[k + 1] !== '=') {
+    let e = k + 1;
+    while (src[e] === ' ' || src[e] === '\t') e += 1;
+    return { lowered: `def ${name}(${params}): return `, end: e };
+  }
+  if (src[k] === ':') {
+    return { lowered: `def ${name}(${params})`, end: close + 1 };
+  }
+  return null;
+}
+
+function γatStmtStart(out) {
+  for (let i = out.length - 1; i >= 0; i -= 1) {
+    const ch = out[i];
+    if (ch === ' ' || ch === '\t') continue;
+    return ch === '\n';
+  }
+  return true;
+}
+
 function γexpandCore(src) {
   let out = '';
   let i = 0;
@@ -371,6 +445,22 @@ function γexpandCore(src) {
       continue;
     }
     const prev = out.length ? out[out.length - 1] : '';
+    if (/[A-Za-z_]/.test(ch) && !γid(prev)) {
+      let w = ch;
+      let j = i + 1;
+      while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) { w += src[j]; j += 1; }
+      if (w === 'fn' && !γid(src[j] ?? '') && γatStmtStart(out)) {
+        const fn = γparseFn(src, i);
+        if (fn) { out += fn.lowered; i = fn.end; continue; }
+      }
+      if (ΓASCII_AGG.has(w) && !γid(src[j] ?? '')) {
+        const agg = γparseAsciiAgg(src, i, w);
+        if (agg) { out += agg.lowered; i = agg.end; continue; }
+      }
+      out += w;
+      i = j;
+      continue;
+    }
     if ((ch === 'Σ' || ch === 'Π' || ch === 'π') && !γid(prev)) {
       const agg = γparseAgg(src, i);
       if (agg) { out += agg.lowered; i = agg.end; continue; }

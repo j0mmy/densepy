@@ -66,6 +66,16 @@ const CASES = [
     py: 'n = 7\nprint(f"n={n} double={n * 2} pad={n:>4}")\n',
   },
   {
+    name: 'dense fn expression bodies',
+    gpy: 'fn f(n) = 1 if n <= 1 else n * f(n - 1)\nprint(f(6))\n',
+    py: 'def f(n):\n    if n <= 1:\n        return 1\n    return n * f(n - 1)\nprint(f(6))\n',
+  },
+  {
+    name: 'dense aggregates',
+    gpy: 'xs = [1, 2, 3, 4, 5]\nprint(sum[x:xs|x%2==0] x*x, prod[x:xs] x, sel[x:xs|x>3] x)\n',
+    py: 'import math\nxs = [1, 2, 3, 4, 5]\nprint(sum((x*x) for x in xs if x%2==0), math.prod(x for x in xs), [x for x in xs if x>3])\n',
+  },
+  {
     name: 'strings and comments stay literal',
     gpy: '# ≔ in comment\n☉("glyphs λ ≔ × stay")\n',
     py: '# = in comment\nprint("glyphs λ ≔ × stay")\n',

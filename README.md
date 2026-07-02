@@ -58,6 +58,21 @@ node bin/gpy.mjs --version
 The full language reference (glyph tables, macro grammar, identifier rules,
 known limits, measured token density) lives in `docs/GLYPH_SPEC.md`.
 
+## Dense ASCII surface (token-optimized)
+
+For agent authoring where token cost matters, the dense surface beats plain
+Python by ~16% measured BPE tokens (`scripts/density.gpy`, o200k_base):
+
+```text
+fn f(n) = 1 if n <= 1 else n * f(n - 1)
+total = sum[x:xs|x%2==0] x*x
+p = prod[x:xs] x
+ys = sel[x:xs|x>0] f(x)
+```
+
+Dense and glyph forms coexist in one `.gpy` file; both compile to the same
+Python. See the spec for exact lowering and unambiguity rules.
+
 ## Project workflow
 
 Real multi-module projects, driven by `gpy.toml`:
