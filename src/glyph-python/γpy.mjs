@@ -787,6 +787,7 @@ export function γrun(source, opts = {}) {
         cwd: opts.cwd,
         encoding: 'utf8',
         env: opts.env ?? process.env,
+        stdio: ['inherit', 'pipe', 'pipe'],
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -796,6 +797,7 @@ export function γrun(source, opts = {}) {
     cwd: opts.cwd,
     encoding: 'utf8',
     env: opts.env ?? process.env,
+    stdio: ['inherit', 'pipe', 'pipe'],
   });
 }
 

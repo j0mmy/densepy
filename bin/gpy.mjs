@@ -253,6 +253,7 @@ function ΩcmdRun(argv) {
     const result = spawnSync(Ωpython(), [entry, ...ΩargvAfterDash(argv)], {
       encoding: 'utf8',
       env: process.env,
+      stdio: ['inherit', 'pipe', 'pipe'],
     });
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) {

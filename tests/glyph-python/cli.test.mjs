@@ -111,6 +111,22 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ run forwards stdin to the program', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-stdin-'));
+  try {
+    const file = join(root, 'echoer.gpy');
+    writeFileSync(file, 'import sys\nprint(sys.stdin.read().upper().strip())\n');
+    const r = spawnSync(process.execPath, [Υ, 'run', file], {
+      input: 'hello γ',
+      encoding: 'utf8',
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.trim(), 'HELLO Γ');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 τ('Υ --version prints the package version', () => {
   const expected = JSON.parse(readFileSync(join(ρ, 'package.json'), 'utf8')).version;
   const r = ψ(['--version']);
@@ -119,4 +135,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy CLI tests: 6 passed, 0 failed');
+console.log('\nγpy CLI tests: 7 passed, 0 failed');

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — 2026-07-02
+
+- Fix: `gpy run` now forwards stdin to the program (file and project
+  modes). Found by the sonnet A/B benchmark — the JSON-parser task was
+  the first stdin-reading program ever run under gpy.
+
 ## 0.6.0 — 2026-07-02
 
 AXI-style agent diagnostics.
