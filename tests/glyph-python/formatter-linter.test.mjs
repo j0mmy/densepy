@@ -88,6 +88,11 @@ function τ(name, fn) {
   assert.match(text, /caps\.gpy:5 capability: dynamic code execution/);
 });
 
+τ('γlint never flags capability or style patterns inside string literals', () => {
+  const src = 'msg="import subprocess and urllib and open(x,\'w\') and eval()"\ntext="def not flagged"\nprint(msg)\n';
+  assert.deepEqual(γlint(src, { path: 'strings.gpy' }), []);
+});
+
 τ('Υ fmt and lint with no file process the whole project tree', () => {
   const root = mkdtempSync(join(tmpdir(), 'γpy-proj-fmtlint-'));
   try {
@@ -109,4 +114,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy formatter/linter tests: 6 passed, 0 failed');
+console.log('\nγpy formatter/linter tests: 7 passed, 0 failed');
