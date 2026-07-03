@@ -1,0 +1,13 @@
+data[Point x,y=0]
+data[Bag label='b',items=[]]
+p ≔ Point(3)
+q ≔ Point(1,2)
+☉(p.x,p.y)
+☉(q.x,q.y)
+u ≔ Bag()
+v ≔ Bag('v')
+u.items.append(7)
+☉(u.label,u.items)
+☉(v.label,v.items)
+data ≔ {'k':9}
+☉(data['k'])

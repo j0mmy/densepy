@@ -170,6 +170,54 @@ fn parse_comp(s,i):
  call=ns[-1]+'('+args+')'
  for x in reversed(ns[:-1]):call=x+'('+call+')'
  return call,a+1
+fn parse_try(s,i):
+ op=i+3
+ if at(s,op)!='[':return None
+ c=match_paren(s,op)
+ if c<0:return None
+ h=s[op+1:c]
+ b=top_index(h,'|')
+ ex=(h if b<0 else h[:b]).strip()
+ xc=''if b<0 else h[b+1:].strip()
+ if ex==''or(b>=0 and xc==''):return None
+ k=c+1
+ while at(s,k)==' 'or at(s,k)=='\t':k+=1
+ x=at(s,k)
+ if x==''or not(gid(x)or x in'"\'([{¬−+-'):return None
+ z=body_end(s,k)
+ d=s[k:z].strip()
+ if d=='':return None
+ xa=(',('+expand_core(xc)+')')if xc!=''else''
+ return'_dp_try(lambda:('+expand_core(ex)+'),lambda:('+expand_core(d)+')'+xa+')',z
+fn parse_data(s,i):
+ op=i+4
+ if at(s,op)!='[':return None
+ c=match_paren(s,op)
+ if c<0:return None
+ h=s[op+1:c]
+ j=0;n=len(h)
+ while j<n and h[j].isspace():j+=1
+ k=j
+ while k<n and gid(h[k]):k+=1
+ nm=h[j:k]
+ if not is_ident(nm):return None
+ if k>=n or not h[k].isspace():return None
+ while k<n and h[k].isspace():k+=1
+ rest=h[k:]
+ sp=[];cur=0;m=len(rest)
+ while cur<m:
+  cm=top_index(rest[cur:],',')
+  part=rest[cur:] if cm<0 else rest[cur:cur+cm]
+  cur=m if cm<0 else cur+cm+1
+  e=top_index(part,'=')
+  f=(part if e<0 else part[:e]).strip()
+  if not is_ident(f):return None
+  d=''if e<0 else part[e+1:].strip()
+  if e>=0 and d=='':return None
+  if e<0:sp.append("('"+f+"',object)")
+  else:sp.append("('"+f+"',object,dataclasses.field(default_factory=lambda:("+expand_core(d)+")))")
+ if len(sp)==0:return None
+ return nm+"=dataclasses.make_dataclass('"+nm+"',["+','.join(sp)+"])",c+1
 fn parse_ascii(s,i,w):
  op=i+len(w)
  if at(s,op)!='[':return None
@@ -216,6 +264,12 @@ fn expand_core(s):
    if w=='fn'and not gid(at(s,j))and stmt_start(o):
     r=parse_fn(s,i)
     if r is not None:o+=r[0];i=r[1];continue
+   if w=='data'and at(s,j)=='['and stmt_start(o):
+    r=parse_data(s,i)
+    if r is not None:o+=r[0];i=r[1];continue
+   if w=='try'and at(s,j)=='[':
+    r=parse_try(s,i)
+    if r is not None:o+=r[0];i=r[1];continue
    if w in AGG and not gid(at(s,j)):
     r=parse_ascii(s,i,w)
     if r is not None:o+=r[0];i=r[1];continue
@@ -230,8 +284,12 @@ fn expand_core(s):
  return o
 fn expand_macros(s):
  z=expand_core(s)
- if'math.prod('in z and re.search(r'^\s*import\s+math\b',z,re.M)is None:return'import math\n'+z
- return z
+ p=[]
+ if'math.prod('in z and re.search(r'^\s*import\s+math\b',z,re.M)is None:p.append('import math')
+ if'dataclasses.make_dataclass('in z and re.search(r'^\s*import\s+dataclasses\b',z,re.M)is None:p.append('import dataclasses')
+ if'_dp_try('in z:p.append('def _dp_try(f,d,e=Exception):\n try:return f()\n except e:return d()')
+ if len(p)==0:return z
+ return'\n'.join(p)+'\n'+z
 fn code_only(s):
  o='';i=0;n=len(s)
  while i<n:
