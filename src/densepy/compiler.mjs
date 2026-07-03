@@ -1,6 +1,7 @@
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   isIdentChar,
@@ -234,6 +235,34 @@ const ASCII_AGGREGATES = new Map(Object.entries({
 
 const EXPR_START_RE = /[\p{L}\p{N}_"'([{¬−+-]/u;
 
+// try[expr]default  /  try[expr|ExcType]default — expression-position fallback.
+// Both expr and default are thunked so the default only evaluates on failure.
+// Lowered only when a body expression follows the closer (like the aggregates),
+// so `try[k]` / `try[a:b]` with no body stay untouched. Requires the runtime
+// helper _dp_try, injected on use.
+function parseTryExpr(src, i) {
+  const open = i + 3;
+  if (src[open] !== '[') return null;
+  const close = matchBracket(src, open);
+  if (close === -1) return null;
+  const inner = src.slice(open + 1, close);
+  const bar = topLevelIndex(inner, '|');
+  const expr = (bar === -1 ? inner : inner.slice(0, bar)).trim();
+  const exc = bar === -1 ? null : inner.slice(bar + 1).trim();
+  if (!expr || (bar !== -1 && !exc)) return null;
+  let k = close + 1;
+  while (src[k] === ' ' || src[k] === '\t') k += 1;
+  if (!EXPR_START_RE.test(src[k] ?? '')) return null;
+  const end = expressionEnd(src, k);
+  const dflt = src.slice(k, end).trim();
+  if (!dflt) return null;
+  const excArg = exc ? `,(${expandMacroForms(exc)})` : '';
+  return {
+    lowered: `_dp_try(lambda:(${expandMacroForms(expr)}),lambda:(${expandMacroForms(dflt)})${excArg})`,
+    end,
+  };
+}
+
 // data[Name field,field=default,...] — record definition, statement position
 // only. Lowers to a single dataclasses.make_dataclass line (no line-count
 // change, so diagnostics stay aligned); defaults use default_factory, which
@@ -363,6 +392,10 @@ function expandMacroForms(src) {
         const rec = parseDataRecord(src, i);
         if (rec) { out += rec.lowered; i = rec.end; continue; }
       }
+      if (w === 'try' && src[j] === '[') {
+        const t = parseTryExpr(src, i);
+        if (t) { out += t.lowered; i = t.end; continue; }
+      }
       if (ASCII_AGGREGATES.has(w) && !isIdentChar(src[j] ?? '')) {
         const agg = parseAsciiAggregate(src, i, w);
         if (agg) { out += agg.lowered; i = agg.end; continue; }
@@ -390,8 +423,12 @@ function expandMacros(source) {
   const prelude = [];
   if (expanded.includes('math.prod(') && !/^\s*import\s+math\b/m.test(expanded)) prelude.push('import math');
   if (expanded.includes('dataclasses.make_dataclass(') && !/^\s*import\s+dataclasses\b/m.test(expanded)) prelude.push('import dataclasses');
+  // _dp_try keeps its two thunks and the whole helper on one physical line so
+  // injected line count stays 1 and diagnostics remain aligned.
+  if (expanded.includes('_dp_try(')) prelude.push('def _dp_try(f,d,e=Exception):\n try:return f()\n except e:return d()');
   if (!prelude.length) return { code: expanded, injectedLines: 0 };
-  return { code: `${prelude.join('\n')}\n${expanded}`, injectedLines: prelude.length };
+  const preludeText = prelude.join('\n');
+  return { code: `${preludeText}\n${expanded}`, injectedLines: countLines(preludeText) + 1 };
 }
 
 function countLines(text) {
@@ -616,15 +653,25 @@ export function lintSource(source, opts = {}) {
   return warnings;
 }
 
+// Command that runs the compiled temp file, sandboxed under the safe-mode
+// audit hook when opts.safe is set. Kept out of the user file, so line numbers
+// (and thus diagnostics) are unaffected by the guard.
+function runFileArgs(file, argv, safe) {
+  if (!safe) return [file, ...argv];
+  const guardDir = dirname(fileURLToPath(new URL('./runtime/safe_guard.py', import.meta.url)));
+  const wrapper = `import sys;sys.path.insert(0,${JSON.stringify(guardDir)});import safe_guard;safe_guard.run(${JSON.stringify(file)},sys.argv[1:])`;
+  return ['-c', wrapper, ...argv];
+}
+
 export function runSource(source, opts = {}) {
   const py = compileToPython(source);
   const argv = opts.argv ?? [];
-  if (argv.length > 0 || opts.fileBacked) {
+  if (argv.length > 0 || opts.fileBacked || opts.safe) {
     const root = mkdtempSync(join(tmpdir(), 'γpy-run-'));
     const file = join(root, '__main__.py');
     try {
       writeFileSync(file, py);
-      return spawnSync(opts.python ?? 'python3', [file, ...argv], {
+      return spawnSync(opts.python ?? 'python3', runFileArgs(file, argv, opts.safe), {
         cwd: opts.cwd,
         encoding: 'utf8',
         env: opts.env ?? process.env,

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.0 — 2026-07-02
+
+- `try[expr]default` / `try[expr|ExcType]default`: expression-position
+  fallback, 9 tokens vs 13 for try/except. Both expr and default are lazy
+  (default only evaluates on failure); typed form catches one exception,
+  others propagate. Runtime helper `_dp_try` injected on use.
+- `gpy run --safe`: runtime capability sandbox via a PEP-578 audit hook
+  (src/densepy/runtime/safe_guard.py) — blocks subprocess, network, and
+  file writes before user code runs. Defense-in-depth for machine-written
+  code; installed out-of-band so diagnostics line up.
+
 ## 0.9.0 — 2026-07-02
 
 - `data[Name f1,f2=dflt]` records: 8 tokens vs 21 (tight dataclass) vs 71

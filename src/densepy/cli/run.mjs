@@ -36,7 +36,7 @@ export function cmdRun(argv) {
   const src = readFileSync(file, 'utf8');
   const agent = argv.includes('--agent');
   const { lineOffset } = compileWithSourceMap(src);
-  const result = runSource(src, { argv: argvAfterDash(argv), fileBacked: true, python: resolvePython() });
+  const result = runSource(src, { argv: argvAfterDash(argv), fileBacked: true, safe: argv.includes('--safe'), python: resolvePython() });
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) {
     if (agent && (result.status ?? 1) !== 0) {

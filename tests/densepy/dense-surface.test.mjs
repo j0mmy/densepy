@@ -74,6 +74,26 @@ function τ(name, fn) {
   assert.match(py, /"data\[Point x,y\]"/);
 });
 
+τ('try[...] expressions: catch-all, typed, lazy fallback, propagation', () => {
+  const src = 'x=try[int("12")]0\ny=try[int("nope")]0\nz=try[int("nope")|ValueError]-1\nhits=[]\nfn fallback():hits.append(1);return 9\nw=try[int("5")]fallback()\nprint(x,y,z,w,hits)\n';
+  const r = runSource(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), '12 0 -1 5 []');
+});
+
+τ('try[...] with a non-matching exception type propagates', () => {
+  const r = runSource('print(try[int("nope")|KeyError]0)\n');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /ValueError/);
+});
+
+τ('try[...] leaves real subscripts and non-expression positions untouched', () => {
+  const py = compileToPython('q=try[a:b]\nv=try[k]\ns="try[x]y"\n');
+  assert.match(py, /q=try\[a:b\]/);
+  assert.match(py, /v=try\[k\]/);
+  assert.match(py, /"try\[x\]y"/);
+});
+
 τ('densify minimizes tokens while preserving semantics and staying idempotent', () => {
   const src = 'def grade(n):\n    if n >= 90:\n        return "A"\n    elif n >= 80:\n        return "B"\n    else:\n        return "C"\n\n\nfor x in [95, 85, 60]:\n    print(grade(x))\n';
   const dense = densify(src);
@@ -115,4 +135,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy dense surface tests: 11 passed, 0 failed');
+console.log('\nγpy dense surface tests: 14 passed, 0 failed');

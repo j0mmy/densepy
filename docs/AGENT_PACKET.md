@@ -15,6 +15,8 @@ sel[v:iter|guard] body    -> [(body) for v in iter if guard]
 any[v:iter] body / all[v:iter] body
 data[Name f1,f2=dflt]     -> record class (init/repr/eq via dataclass;
                              statement position; mutable defaults safe)
+try[expr]default          -> expr, or default if expr raises (both lazy)
+try[expr|ExcType]default  -> catch only ExcType; others propagate
 ```
 
 ## Style (canonical; `gpy fmt --dense` enforces)
@@ -46,6 +48,7 @@ gpy run [file] [-- args]     run file or project (gpy.toml: source/emit/main)
 gpy build / check [--types] / test / fmt --dense / lint / watch / repl / lsp
 gpy deps install|add|list|check    .venv + real installs
 gpy pack [files] [--packet]        emit project as one context blob
+gpy run --safe <file>              sandbox: no writes/network/subprocess
 ```
 
 ## Canon is enforced

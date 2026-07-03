@@ -171,5 +171,35 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ run --safe allows pure code but blocks writes, network, and subprocess', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-safe-'));
+  try {
+    const pure = join(root, 'pure.gpy');
+    writeFileSync(pure, 'print(sum[x:range(5)]x*x)\n');
+    const ok = ψ(['run', '--safe', pure]);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(ok.stdout.trim(), '30');
+
+    const write = join(root, 'write.gpy');
+    writeFileSync(write, 'open("out.txt","w").write("x")\n');
+    const blocked = ψ(['run', '--safe', '--agent', write], { cwd: root });
+    assert.notEqual(blocked.status, 0);
+    assert.match(blocked.stderr, /safe mode blocked file write/);
+    assert.ok(!existsSync(join(root, 'out.txt')), 'file was written despite safe mode');
+
+    const proc = join(root, 'proc.gpy');
+    writeFileSync(proc, 'import subprocess\nsubprocess.run(["true"])\n');
+    const procBlocked = ψ(['run', '--safe', proc]);
+    assert.notEqual(procBlocked.status, 0);
+    assert.match(procBlocked.stderr, /safe mode blocked capability: subprocess/);
+
+    const unsafeWrite = ψ(['run', write], { cwd: root });
+    assert.equal(unsafeWrite.status, 0, unsafeWrite.stderr);
+    assert.ok(existsSync(join(root, 'out.txt')), 'normal run should write the file');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy CLI tests: 9 passed, 0 failed');
+console.log('\nγpy CLI tests: 10 passed, 0 failed');
