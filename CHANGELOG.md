@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0 — 2026-07-02
+
+A Philosophy of Software Design pass — zero behavior change, verified
+byte-identical compiler output via the selfhost differential.
+
+- Deep module: src/densepy/walk.mjs owns ALL string/comment/f-string/
+  bracket-depth mechanics behind a 10-export interface; the five scanners
+  that each re-implemented quote rules now consume it.
+- CLI: bin/gpy.mjs is a 35-line dispatcher over src/densepy/cli/
+  per-command modules.
+- Obscurity removed: toolchain internals renamed to descriptive English
+  (compileWithSourceMap, densify, lintSource, facadePrelude, ...);
+  the DensePy language surface is unchanged.
+- Known oddities preserved deliberately and documented (gpy test ignores
+  project venv; fmt/init ad-hoc arg scans) — queued as fixes, not snuck in.
+
 ## 0.7.0 — 2026-07-02
 
 DensePy compiles itself.
