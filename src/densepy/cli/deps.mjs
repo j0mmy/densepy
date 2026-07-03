@@ -11,9 +11,17 @@ function pipSpecs(deps) {
 function pipInstall(specs) {
   if (!specs.length) return 0;
   const custom = process.env.GPY_INSTALLER;
-  const r = custom
-    ? spawnSync(custom, ['install', ...specs], { encoding: 'utf8' })
-    : spawnSync(ensureVenv(), ['-m', 'pip', 'install', ...specs], { encoding: 'utf8' });
+  let r;
+  if (custom) {
+    r = spawnSync(custom, ['install', ...specs], { encoding: 'utf8' });
+  } else {
+    // uv-created venvs ship without pip; install through uv when available,
+    // targeting the venv's interpreter, else fall back to the venv's pip.
+    const python = ensureVenv();
+    r = spawnSync('uv', ['--version'], { encoding: 'utf8' }).status === 0
+      ? spawnSync('uv', ['pip', 'install', '--python', python, ...specs], { encoding: 'utf8' })
+      : spawnSync(python, ['-m', 'pip', 'install', ...specs], { encoding: 'utf8' });
+  }
   if (r.stdout) process.stdout.write(r.stdout);
   if (r.stderr) process.stderr.write(r.stderr);
   return r.status ?? 1;

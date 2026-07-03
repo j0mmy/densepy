@@ -1,14 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { runSource } from '../compiler.mjs';
 import { findGpyFiles } from './project.mjs';
+import { resolvePython } from './python.mjs';
 
 export function cmdTest(argv) {
   const dir = argv[1] ?? 'tests';
   const files = findGpyFiles(dir);
+  const python = resolvePython();
   let pass = 0;
   let fail = 0;
   for (const file of files) {
-    const result = runSource(readFileSync(file, 'utf8'), { fileBacked: true });
+    const result = runSource(readFileSync(file, 'utf8'), { fileBacked: true, python });
     if ((result.status ?? 1) === 0) pass++;
     else {
       fail++;

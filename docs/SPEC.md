@@ -1,4 +1,8 @@
-# GlyphPython Language Specification (v0.4)
+# DensePy Language Specification
+
+**Spec version 0.8 — stability promise:** constructs documented here compile
+identically within a minor version; removals or meaning changes only at a
+minor bump, announced in CHANGELOG.md.
 
 The canonical reference for writing correct `.gpy` first try. GlyphPython is
 a glyph authoring surface over Python: everything Python can do is available;

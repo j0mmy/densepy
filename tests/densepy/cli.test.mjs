@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, chmodSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, chmodSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -134,5 +134,22 @@ function τ(name, fn) {
   assert.equal(r.stdout.trim(), `gpy ${expected}`);
 });
 
+τ('Υ test runs .gpy tests with the project venv python when present', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-testvenv-'));
+  try {
+    mkdirSync(join(root, '.venv', 'bin'), { recursive: true });
+    const shim = join(root, '.venv', 'bin', 'python');
+    writeFileSync(shim, `#!/bin/sh\ntouch "${join(root, 'venv-used')}"\nexec python3 "$@"\n`);
+    chmodSync(shim, 0o755);
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    writeFileSync(join(root, 'tests', 'ok.gpy'), 'assert ⊤\n');
+    const r = ψ(['test', 'tests'], { cwd: root });
+    assert.equal(r.status, 0, r.stderr || r.stdout);
+    assert.ok(existsSync(join(root, 'venv-used')), 'venv python shim was not used');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy CLI tests: 7 passed, 0 failed');
+console.log('\nγpy CLI tests: 8 passed, 0 failed');

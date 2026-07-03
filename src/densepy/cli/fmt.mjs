@@ -7,7 +7,7 @@ export function cmdFmt(argv) {
   const checkOnly = argv.includes('--check');
   const denseMode = argv.includes('--dense');
   const format = denseMode ? densify : formatSource;
-  const file = argv.find((x, i) => i > 0 && !x.startsWith('--'));
+  const file = argv.find((x, i) => i > 0 && !x.startsWith('-'));
   if (!file) {
     let files;
     try {

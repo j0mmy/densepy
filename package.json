@@ -1,6 +1,6 @@
 {
   "name": "densepy",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "DensePy: a token-minimized, agents-only language that compiles to Python.",
   "type": "module",
   "private": true,
@@ -11,7 +11,8 @@
     "test": "node tests/densepy/token-aliases.test.mjs && node tests/densepy/cli.test.mjs && node tests/densepy/source-map.test.mjs && node tests/densepy/diagnostics.test.mjs && node tests/densepy/macros.test.mjs && node tests/densepy/stdlib-facades.test.mjs && node tests/densepy/project-workflow.test.mjs && node tests/densepy/formatter-linter.test.mjs && node tests/densepy/conformance.test.mjs && node tests/densepy/editor-grammar.test.mjs && node tests/densepy/project-build.test.mjs && node tests/densepy/watch.test.mjs && node tests/densepy/lsp.test.mjs && node tests/densepy/repl.test.mjs && node tests/densepy/dense-surface.test.mjs && node tests/densepy/agent-output.test.mjs",
     "gpy": "node bin/gpy.mjs",
     "check": "npm test",
-    "selfhost": "bash selfhost/bootstrap.sh"
+    "selfhost": "bash selfhost/bootstrap.sh",
+    "interop": "node tests/densepy/interop.test.mjs"
   },
   "engines": {
     "node": ">=20",

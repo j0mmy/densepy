@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.1 — 2026-07-02
+
+- Fix: real dependency installs on machines with uv — uv-created venvs
+  ship without pip, so installs now go through `uv pip --python <venv>`
+  (stdlib-venv fallback keeps `-m pip`). Found by the new host-interop
+  test, which installs a real PyPI package into a project venv and uses
+  it from .gpy (`npm run interop`; runs in CI).
+- Fix: `gpy test` now uses the project venv python like run/check/watch.
+- Fix: `gpy fmt` no longer mistakes single-dash flags for filenames.
+- CI: python 3.11/3.12/3.13 matrix; selfhost bootstrap and interop run
+  on every push. docs/SPEC.md carries a version + stability promise.
+
 ## 0.8.0 — 2026-07-02
 
 A Philosophy of Software Design pass — zero behavior change, verified
