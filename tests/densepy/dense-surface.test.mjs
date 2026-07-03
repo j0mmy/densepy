@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompile, γrun, γdense } from '../../src/glyph-python/γpy.mjs';
+import { γcompile, γrun, γdense } from '../../src/densepy/compiler.mjs';
 
 function τ(name, fn) {
   try {

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { γcompile } from '../src/glyph-python/γpy.mjs';
+import { γcompile } from '../src/densepy/compiler.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const CORPUS = join(HERE, 'corpus');

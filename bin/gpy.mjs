@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join, basename, relative, dirname } from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γdense, γlint, γprelude } from '../src/glyph-python/γpy.mjs';
-import { γlspServe } from '../src/glyph-python/lsp.mjs';
+import { γcompile, γcompileWithMap, γrun, γcheck, γformat, γdense, γlint, γprelude } from '../src/densepy/compiler.mjs';
+import { γlspServe } from '../src/densepy/lsp.mjs';
 
 function Ωusage() {
   console.log(`Usage:

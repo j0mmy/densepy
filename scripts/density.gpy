@@ -95,6 +95,6 @@ Dλ ≔ 0
 ☉(f"DENSE TOTAL: dense={Dγ} py={Dλ} ratio={Dγ/Dλ:.2f}")
 
 ☉("=== example corpus (raw γ source) ===")
-∀ f ∈ sorted(P("examples/glyph-python").rglob("*.gpy")):
+∀ f ∈ sorted(P("examples/densepy").rglob("*.gpy")):
     s ≔ f.read_text()
     ☉(f"{f.name}: chars={len(s)} tokens={toks(s)}")

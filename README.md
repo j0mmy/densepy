@@ -22,13 +22,18 @@ The project began as GlyphPython; the glyph surface (λ, ⎇, Σ…) still
 compiles but costs 1.35× Python tokens and is now legacy. The CLI remains
 `gpy` and sources remain `.gpy`.
 
+**DensePy is self-hosting:** `selfhost/src/compiler.gpy` is a DensePy
+compiler written in DensePy. `npm run selfhost` verifies the bootstrap —
+the corpus compiles byte-identically to the JS compiler, and the compiler
+compiles itself to a byte-identical fixpoint (gen1 == gen2).
+
 ## Install
 
 From a fresh checkout (requires Node >= 20 and Python >= 3.11):
 
 ```bash
 npm link        # makes `gpy` available on PATH
-gpy --version   # gpy 0.6.3
+gpy --version   # gpy 0.7.0
 ```
 
 Or run without installing: `node bin/gpy.mjs <command>`.
@@ -37,8 +42,8 @@ Or run without installing: `node bin/gpy.mjs <command>`.
 
 ```bash
 npm test
-node bin/gpy.mjs run examples/glyph-python/factorial.gpy
-node bin/gpy.mjs build examples/glyph-python/factorial.gpy -o /tmp/factorial.py
+node bin/gpy.mjs run examples/densepy/factorial.gpy
+node bin/gpy.mjs build examples/densepy/factorial.gpy -o /tmp/factorial.py
 python3 /tmp/factorial.py
 ```
 
@@ -70,7 +75,7 @@ node bin/gpy.mjs --version
 ```
 
 The full language reference (glyph tables, macro grammar, identifier rules,
-known limits, measured token density) lives in `docs/GLYPH_SPEC.md`.
+known limits, measured token density) lives in `docs/SPEC.md`.
 
 ## Dense ASCII surface (token-optimized)
 
@@ -104,7 +109,7 @@ gpy watch                   # re-check the whole project on every save
 Modules import each other with normal Python imports: `from helper import φ`
 where `src/helper.gpy` exists. Runtime tracebacks remap every project frame
 back to `.gpy` sources. A working multi-module HTTP backend lives in
-`examples/glyph-python/webapp` (run `gpy run` inside it).
+`examples/densepy/webapp` (run `gpy run` inside it).
 
 If installed through npm, the same commands are available as `gpy ...`.
 
@@ -168,7 +173,7 @@ escapes are preserved.
 A real-world example combining CSV, File, Σ, and π:
 
 ```bash
-node bin/gpy.mjs run examples/glyph-python/csv-report.gpy   # needs scores.csv in cwd
+node bin/gpy.mjs run examples/densepy/csv-report.gpy   # needs scores.csv in cwd
 ```
 
 ## Editor support
@@ -197,15 +202,15 @@ permissions. Review code you did not write before running it.
 
 ```text
 bin/gpy.mjs                         CLI
-src/glyph-python/γpy.mjs            compiler/runtime helpers
-src/glyph-python/lsp.mjs            language server (diagnostics)
-examples/glyph-python/*.gpy         runnable examples
-examples/glyph-python/webapp/       multi-module HTTP backend project
-tests/glyph-python/*.test.mjs       executable tests
+src/densepy/compiler.mjs            compiler/runtime helpers
+src/densepy/lsp.mjs            language server (diagnostics)
+examples/densepy/*.gpy         runnable examples
+examples/densepy/webapp/       multi-module HTTP backend project
+tests/densepy/*.test.mjs       executable tests
 editors/vscode/                     VS Code extension (grammar + LSP client)
 .github/workflows/ci.yml            CI (ubuntu + macos)
 CHANGELOG.md                        release notes
-docs/GLYPHPYTHON_ROADMAP.md         buildout roadmap
+docs/ROADMAP.md         buildout roadmap
 AGENTS.md                           contributor/agent rules
 ```
 

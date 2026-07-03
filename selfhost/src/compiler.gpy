@@ -1,4 +1,4 @@
-# selfhost: DensePy compiler (.gpy -> python), port of src/glyph-python/γpy.mjs
+# selfhost: DensePy compiler (.gpy -> python), port of src/densepy/compiler.mjs
 # usage: python3 γpy.py file.gpy  (compiled python on stdout)
 import re,sys
 W={'λ':'def','⎇':'if','∴':'else','↻':'while','∀':'for','∈':'in','⊢':'return','☉':'print','⊤':'True','⊥':'False','∅':'None','∧':'and','∨':'or','¬':'not'}

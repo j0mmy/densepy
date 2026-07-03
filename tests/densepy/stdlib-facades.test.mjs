@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompile, γrun } from '../../src/glyph-python/γpy.mjs';
+import { γcompile, γrun } from '../../src/densepy/compiler.mjs';
 
 function τ(name, fn) {
   try {
@@ -92,7 +92,7 @@ function pyCompile(src) {
   const root = mkdtempSync(join(tmpdir(), 'γpy-dogfood-'));
   try {
     writeFileSync(join(root, 'scores.csv'), 'name,score\na,5\nb,12\nc,20\n');
-    const src = join(ρ, 'examples/glyph-python/csv-report.gpy');
+    const src = join(ρ, 'examples/densepy/csv-report.gpy');
     const r = spawnSync(process.execPath, [join(ρ, 'bin/gpy.mjs'), 'run', src], { cwd: root, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr || r.stdout);
     assert.equal(r.stdout.trim(), 'rows=3 total=37 high=2');

@@ -43,7 +43,7 @@ function τ(name, fn) {
   try {
     const src = join(root, 'factorial.gpy');
     const out = join(root, 'factorial.py');
-    writeFileSync(src, readFileSync(join(ρ, 'examples/glyph-python/factorial.gpy'), 'utf8'));
+    writeFileSync(src, readFileSync(join(ρ, 'examples/densepy/factorial.gpy'), 'utf8'));
 
     const build = ψ(['build', src, '-o', out]);
     assert.equal(build.status, 0, build.stderr || build.stdout);

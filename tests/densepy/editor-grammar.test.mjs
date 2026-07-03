@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ΓMAP } from '../../src/glyph-python/γpy.mjs';
+import { ΓMAP } from '../../src/densepy/compiler.mjs';
 
 const ρ = new URL('../..', import.meta.url).pathname;
 

@@ -39,7 +39,7 @@ Before reporting completion, run:
 
 ```bash
 npm test
-node bin/gpy.mjs run examples/glyph-python/factorial.gpy
+node bin/gpy.mjs run examples/densepy/factorial.gpy
 ```
 
 For compiler changes, add or update tests first, then run the focused test and full `npm test`.

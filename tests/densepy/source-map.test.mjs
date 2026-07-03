@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompileWithMap } from '../../src/glyph-python/γpy.mjs';
+import { γcompileWithMap } from '../../src/densepy/compiler.mjs';
 
 const ρ = new URL('../..', import.meta.url).pathname;
 const Υ = join(ρ, 'bin/gpy.mjs');

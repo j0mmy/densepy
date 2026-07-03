@@ -1,4 +1,4 @@
-import { γcompileWithMap, γcheck } from './γpy.mjs';
+import { γcompileWithMap, γcheck } from './compiler.mjs';
 
 // Minimal LSP server: Content-Length framed JSON-RPC over stdio.
 // Diagnostics come from γcheck (ast.parse, never executes user code),

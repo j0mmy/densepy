@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { γrun } from '../../src/glyph-python/γpy.mjs';
+import { γrun } from '../../src/densepy/compiler.mjs';
 
 function τ(name, fn) {
   try {

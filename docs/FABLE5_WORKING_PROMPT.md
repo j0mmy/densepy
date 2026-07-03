@@ -9,5 +9,5 @@ Keep host/runtime boundaries valid: Python imports, package names, CLI flags, JS
 
 Keep changes focused on `.gpy -> .py` compiler/tooling work. If a task is not about GlyphPython language tooling, stop and ask.
 
-Before reporting completion, run npm test and node bin/gpy.mjs run examples/glyph-python/factorial.gpy.
+Before reporting completion, run npm test and node bin/gpy.mjs run examples/densepy/factorial.gpy.
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-hosting fixpoint proof for the DensePy compiler.
-# stage0: JS compiler builds gen1.py from selfhost/src/γpy.gpy
+# stage0: JS compiler builds gen1.py from selfhost/src/compiler.gpy
 # stage1: gen1 compiles the corpus; differential vs JS compiler passes
 # stage2: gen1 compiles itself -> gen2; gen2's corpus compilations are
 #         byte-identical to gen1's, and the differential passes with gen2.
@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "== stage0: JS compiler builds gen1.py =="
-node bin/gpy.mjs build selfhost/src/γpy.gpy -o selfhost/gen1.py
+node bin/gpy.mjs build selfhost/src/compiler.gpy -o selfhost/gen1.py
 python3 -c "import ast;ast.parse(open('selfhost/gen1.py',encoding='utf-8').read())"
 echo "gen1.py built and parses"
 
@@ -16,7 +16,7 @@ echo "== stage1: differential (JS compiler vs gen1) =="
 SELF_COMPILER=selfhost/gen1.py node selfhost/differential.mjs
 
 echo "== stage2: gen1 compiles itself -> gen2 =="
-python3 selfhost/gen1.py selfhost/src/γpy.gpy > selfhost/gen2.py
+python3 selfhost/gen1.py selfhost/src/compiler.gpy > selfhost/gen2.py
 python3 -c "import ast;ast.parse(open('selfhost/gen2.py',encoding='utf-8').read())"
 if cmp -s selfhost/gen1.py selfhost/gen2.py; then
   echo "gen1 == gen2 (byte-identical self-compilation fixpoint)"

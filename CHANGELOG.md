@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.0 — 2026-07-02
+
+DensePy compiles itself.
+
+- Self-hosting: selfhost/src/compiler.gpy is a DensePy→Python compiler
+  written in DensePy (298 lines, ~3.9k tokens, canonical dense style,
+  lint-clean). `npm run selfhost` proves the full bootstrap: 30/30 corpus
+  programs byte-identical to the JS compiler's output, and gen1==gen2 —
+  a byte-identical self-compilation fixpoint. Built by a Fable-tier agent.
+- Rename: internals are now densepy (src/densepy/compiler.mjs,
+  tests/densepy/, examples/densepy/, docs/SPEC.md, docs/ROADMAP.md);
+  history preserved via git mv. CLI stays `gpy`, sources stay `.gpy`.
+- Lint honesty: capability/style rules no longer fire inside string
+  literals (string contents blanked before matching; open()-mode check
+  anchors on code). Removed the escape-sequence workaround the bootstrap
+  agent had used to silence string-content lint.
+
 ## 0.6.3 — 2026-07-02
 
 - Fix: aggregate bodies stop at a top-level `:` — `if all[x:xs]x>0:...`

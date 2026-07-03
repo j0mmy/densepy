@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompile, γrun } from '../../src/glyph-python/γpy.mjs';
+import { γcompile, γrun } from '../../src/densepy/compiler.mjs';
 
 const repoRoot = new URL('../..', import.meta.url).pathname;
 
@@ -43,7 +43,7 @@ function pyCompile(src) {
 });
 
 τ('γ factorial runs on python and prints 720', () => {
-  const src = readFileSync(join(repoRoot, 'examples/glyph-python/factorial.gpy'), 'utf8');
+  const src = readFileSync(join(repoRoot, 'examples/densepy/factorial.gpy'), 'utf8');
   const result = γrun(src);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), '720');
@@ -53,7 +53,7 @@ function pyCompile(src) {
   const root = mkdtempSync(join(tmpdir(), 'γpy-json-'));
   try {
     writeFileSync(join(root, 'data.json'), '{"name":"JT","score":10}');
-    const src = readFileSync(join(repoRoot, 'examples/glyph-python/json-file.gpy'), 'utf8');
+    const src = readFileSync(join(repoRoot, 'examples/densepy/json-file.gpy'), 'utf8');
     const result = γrun(src, { cwd: root });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout.trim(), 'JT:10');
@@ -100,7 +100,7 @@ function pyCompile(src) {
   const root = mkdtempSync(join(tmpdir(), 'γpy-cli-'));
   const out = join(root, 'factorial.py');
   try {
-    const src = join(repoRoot, 'examples/glyph-python/factorial.gpy');
+    const src = join(repoRoot, 'examples/densepy/factorial.gpy');
     const build = spawnSync(process.execPath, [join(repoRoot, 'bin/gpy.mjs'), 'build', src, '-o', out], { encoding: 'utf8' });
     assert.equal(build.status, 0, build.stderr || build.stdout);
     assert.match(readFileSync(out, 'utf8'), /def φ/);

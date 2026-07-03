@@ -96,7 +96,7 @@ function μproject(root) {
 τ('webapp example project serves a real HTTP request end to end', () => {
   const root = mkdtempSync(join(tmpdir(), 'γpy-webapp-'));
   try {
-    cpSync(join(ρ, 'examples/glyph-python/webapp'), root, { recursive: true });
+    cpSync(join(ρ, 'examples/densepy/webapp'), root, { recursive: true });
     const r = ψ(['run'], { cwd: root });
     assert.equal(r.status, 0, r.stderr + r.stdout);
     assert.equal(r.stdout.trim(), 'GLY backend ready');
