@@ -151,5 +151,25 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ pack emits an agent-ready project blob with token accounting', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-pack-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'packer']).status, 0);
+    writeFileSync(join(root, 'src', 'util.gpy'), 'fn double(x)=x*2\n');
+    const r = ψ(['pack'], { cwd: root });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, /=== FILE: src\/main\.gpy ===/);
+    assert.match(r.stdout, /=== FILE: src\/util\.gpy ===/);
+    assert.match(r.stdout, /fn double\(x\)=x\*2/);
+    assert.match(r.stderr, /pack: 2 files, \d+ chars, ~\d+ tokens/);
+
+    const withPacket = ψ(['pack', '--packet'], { cwd: root });
+    assert.equal(withPacket.status, 0, withPacket.stderr + withPacket.stdout);
+    assert.match(withPacket.stdout, /# DensePy agent packet/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy CLI tests: 8 passed, 0 failed');
+console.log('\nγpy CLI tests: 9 passed, 0 failed');

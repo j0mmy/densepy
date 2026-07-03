@@ -60,6 +60,20 @@ function τ(name, fn) {
   assert.deepEqual(r.stdout.trim().split('\n'), ['all-pos', 'yes']);
 });
 
+τ('data[...] records lower to dataclasses with defaults, repr, and equality', () => {
+  const src = 'data[Point x,y=0]\ndata[Box items=[]]\np=Point(3)\nb=Box()\nb.items.append(1)\nprint(p,p==Point(3,0),p.x+p.y,Box().items,b.items)\n';
+  const r = runSource(src);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), 'Point(x=3, y=0) True 3 [] [1]');
+});
+
+τ('data[...] leaves real subscripts and non-statement positions untouched', () => {
+  const py = compileToPython('q=data[a:b]\nv=data[k]\ns="data[Point x,y]"\n');
+  assert.match(py, /q=data\[a:b\]/);
+  assert.match(py, /v=data\[k\]/);
+  assert.match(py, /"data\[Point x,y\]"/);
+});
+
 τ('densify minimizes tokens while preserving semantics and staying idempotent', () => {
   const src = 'def grade(n):\n    if n >= 90:\n        return "A"\n    elif n >= 80:\n        return "B"\n    else:\n        return "C"\n\n\nfor x in [95, 85, 60]:\n    print(grade(x))\n';
   const dense = densify(src);
@@ -101,4 +115,4 @@ function τ(name, fn) {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
-console.log('\nγpy dense surface tests: 9 passed, 0 failed');
+console.log('\nγpy dense surface tests: 11 passed, 0 failed');

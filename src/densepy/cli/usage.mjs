@@ -14,6 +14,7 @@ export function printUsage() {
   node bin/gpy.mjs deps install
   node bin/gpy.mjs deps list
   node bin/gpy.mjs deps check <package>
+  node bin/gpy.mjs pack [files...] [--packet]
 `);
 }
 

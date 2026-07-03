@@ -11,6 +11,7 @@ import { cmdLint } from '../src/densepy/cli/lint.mjs';
 import { cmdInit } from '../src/densepy/cli/init.mjs';
 import { cmdDeps } from '../src/densepy/cli/deps.mjs';
 import { cmdVersion } from '../src/densepy/cli/version.mjs';
+import { cmdPack } from '../src/densepy/cli/pack.mjs';
 import { badUsage } from '../src/densepy/cli/usage.mjs';
 
 function main(argv) {
@@ -27,6 +28,7 @@ function main(argv) {
   if (cmd === 'lint') return cmdLint(argv);
   if (cmd === 'init') return cmdInit(argv);
   if (cmd === 'deps') return cmdDeps(argv);
+  if (cmd === 'pack') return cmdPack(argv);
   return badUsage();
 }
 

@@ -234,6 +234,45 @@ const ASCII_AGGREGATES = new Map(Object.entries({
 
 const EXPR_START_RE = /[\p{L}\p{N}_"'([{¬−+-]/u;
 
+// data[Name field,field=default,...] — record definition, statement position
+// only. Lowers to a single dataclasses.make_dataclass line (no line-count
+// change, so diagnostics stay aligned); defaults use default_factory, which
+// makes mutable defaults safe by construction. Content that does not match
+// the Name-plus-fields shape (real subscripts like data[k], data[a:b]) is
+// left untouched.
+function parseDataRecord(src, i) {
+  const open = i + 4;
+  if (src[open] !== '[') return null;
+  const close = matchBracket(src, open);
+  if (close === -1) return null;
+  const content = src.slice(open + 1, close);
+  const nameMatch = content.match(/^\s*([\p{L}_][\p{L}\p{N}_]*)\s+/u);
+  if (!nameMatch) return null;
+  const name = nameMatch[1];
+  const rest = content.slice(nameMatch[0].length);
+  const fields = [];
+  let cursor = 0;
+  while (cursor < rest.length) {
+    let comma = topLevelIndex(rest.slice(cursor), ',');
+    const part = comma === -1 ? rest.slice(cursor) : rest.slice(cursor, cursor + comma);
+    cursor = comma === -1 ? rest.length : cursor + comma + 1;
+    const eq = topLevelIndex(part, '=');
+    const fieldName = (eq === -1 ? part : part.slice(0, eq)).trim();
+    if (!IDENT_RE.test(fieldName)) return null;
+    const dflt = eq === -1 ? null : part.slice(eq + 1).trim();
+    if (eq !== -1 && !dflt) return null;
+    fields.push({ fieldName, dflt });
+  }
+  if (!fields.length) return null;
+  const specs = fields.map(({ fieldName, dflt }) => (dflt === null
+    ? `('${fieldName}',object)`
+    : `('${fieldName}',object,dataclasses.field(default_factory=lambda:(${expandMacroForms(dflt)})))`));
+  return {
+    lowered: `${name}=dataclasses.make_dataclass('${name}',[${specs.join(',')}])`,
+    end: close + 1,
+  };
+}
+
 function parseAsciiAggregate(src, i, word) {
   const open = i + word.length;
   if (src[open] !== '[') return null;
@@ -320,6 +359,10 @@ function expandMacroForms(src) {
         const fn = parseFnDefinition(src, i);
         if (fn) { out += fn.lowered; i = fn.end; continue; }
       }
+      if (w === 'data' && src[j] === '[' && atStatementStart(out)) {
+        const rec = parseDataRecord(src, i);
+        if (rec) { out += rec.lowered; i = rec.end; continue; }
+      }
       if (ASCII_AGGREGATES.has(w) && !isIdentChar(src[j] ?? '')) {
         const agg = parseAsciiAggregate(src, i, w);
         if (agg) { out += agg.lowered; i = agg.end; continue; }
@@ -344,10 +387,11 @@ function expandMacroForms(src) {
 
 function expandMacros(source) {
   const expanded = expandMacroForms(String(source));
-  if (expanded.includes('math.prod(') && !/^\s*import\s+math\b/m.test(expanded)) {
-    return { code: `import math\n${expanded}`, injectedLines: 1 };
-  }
-  return { code: expanded, injectedLines: 0 };
+  const prelude = [];
+  if (expanded.includes('math.prod(') && !/^\s*import\s+math\b/m.test(expanded)) prelude.push('import math');
+  if (expanded.includes('dataclasses.make_dataclass(') && !/^\s*import\s+dataclasses\b/m.test(expanded)) prelude.push('import dataclasses');
+  if (!prelude.length) return { code: expanded, injectedLines: 0 };
+  return { code: `${prelude.join('\n')}\n${expanded}`, injectedLines: prelude.length };
 }
 
 function countLines(text) {

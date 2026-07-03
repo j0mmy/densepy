@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0 — 2026-07-02
+
+- `data[Name f1,f2=dflt]` records: 8 tokens vs 21 (tight dataclass) vs 71
+  (plain class), measured. Single-line lowering keeps diagnostics aligned;
+  default_factory makes mutable defaults safe by construction.
+- `gpy pack [files] [--packet]`: emit the project as one agent-ready
+  context blob with token accounting on stderr — context loading as a
+  first-class command.
+
 ## 0.8.1 — 2026-07-02
 
 - Fix: real dependency installs on machines with uv — uv-created venvs

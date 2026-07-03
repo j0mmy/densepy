@@ -13,6 +13,8 @@ sum[v:iter|guard] body    -> sum((body) for v in iter if guard)
 prod[v:iter] body         -> math.prod(...)  (math auto-imported)
 sel[v:iter|guard] body    -> [(body) for v in iter if guard]
 any[v:iter] body / all[v:iter] body
+data[Name f1,f2=dflt]     -> record class (init/repr/eq via dataclass;
+                             statement position; mutable defaults safe)
 ```
 
 ## Style (canonical; `gpy fmt --dense` enforces)
@@ -43,6 +45,7 @@ any[v:iter] body / all[v:iter] body
 gpy run [file] [-- args]     run file or project (gpy.toml: source/emit/main)
 gpy build / check [--types] / test / fmt --dense / lint / watch / repl / lsp
 gpy deps install|add|list|check    .venv + real installs
+gpy pack [files] [--packet]        emit project as one context blob
 ```
 
 ## Canon is enforced
