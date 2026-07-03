@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { γrun } from '../../src/densepy/compiler.mjs';
+import { runSource } from '../../src/densepy/compiler.mjs';
 
 function τ(name, fn) {
   try {
@@ -84,7 +84,7 @@ const CASES = [
 
 for (const c of CASES) {
   τ(`conformance: ${c.name}`, () => {
-    const γ = γrun(c.gpy);
+    const γ = runSource(c.gpy);
     const λ = pyRun(c.py);
     assert.equal(λ.status, 0, `python baseline failed: ${λ.stderr}`);
     assert.equal(γ.status, λ.status, γ.stderr);
