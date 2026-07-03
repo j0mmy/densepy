@@ -1,12 +1,12 @@
-import { γcompileWithMap, γcheck } from './compiler.mjs';
+import { compileWithSourceMap, checkSource } from './compiler.mjs';
 
 // Minimal LSP server: Content-Length framed JSON-RPC over stdio.
-// Diagnostics come from γcheck (ast.parse, never executes user code),
+// Diagnostics come from checkSource (ast.parse, never executes user code),
 // remapped through the compile lineOffset back to .gpy coordinates.
 
-function γlspDiagnostics(text) {
-  const { lineOffset } = γcompileWithMap(text);
-  const check = γcheck(text);
+function lspDiagnostics(text) {
+  const { lineOffset } = compileWithSourceMap(text);
+  const check = checkSource(text);
   if ((check.status ?? 1) === 0) return [];
   const stderr = String(check.stderr ?? '');
   const lineMatch = stderr.match(/File "<unknown>", line (\d+)/) ?? stderr.match(/line (\d+)/);
@@ -24,7 +24,7 @@ function γlspDiagnostics(text) {
   }];
 }
 
-export function γlspServe(input, output) {
+export function serveLsp(input, output) {
   let pending = Buffer.alloc(0);
 
   const send = (msg) => {
@@ -36,7 +36,7 @@ export function γlspServe(input, output) {
     send({
       jsonrpc: '2.0',
       method: 'textDocument/publishDiagnostics',
-      params: { uri, diagnostics: γlspDiagnostics(text) },
+      params: { uri, diagnostics: lspDiagnostics(text) },
     });
   };
 

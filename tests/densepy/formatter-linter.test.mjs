@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γformat, γlint, γrun } from '../../src/densepy/compiler.mjs';
+import { formatSource, lintSource, runSource } from '../../src/densepy/compiler.mjs';
 
 const ρ = new URL('../..', import.meta.url).pathname;
 const Υ = join(ρ, 'bin/gpy.mjs');
@@ -26,13 +26,13 @@ function τ(name, fn) {
   }
 }
 
-τ('γformat normalizes γ operators while preserving indentation strings comments and imports', () => {
+τ('formatSource normalizes γ operators while preserving indentation strings comments and imports', () => {
   const src = `import json as ξjson\nλ f():   \n    χ≔Ⅰ\n    # keep χ≔Ⅰ in comment\n    ☉("keep χ≔Ⅰ in string")   \n`; 
   const expected = `import json as ξjson\nλ f():\n    χ ≔ Ⅰ\n    # keep χ≔Ⅰ in comment\n    ☉("keep χ≔Ⅰ in string")\n`;
-  const out = γformat(src);
+  const out = formatSource(src);
   assert.equal(out, expected);
-  assert.equal(γformat(out), expected);
-  const r = γrun(`${out}\nf()\n`);
+  assert.equal(formatSource(out), expected);
+  const r = runSource(`${out}\nf()\n`);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), 'keep χ≔Ⅰ in string');
 });
@@ -57,11 +57,11 @@ function τ(name, fn) {
   }
 });
 
-τ('γlint enforces dense canon: def flagged, fn/return/print accepted', () => {
-  const warnings = γlint('def f():\n    print("x")\n    return None\n', { path: 'bad.gpy' });
+τ('lintSource enforces dense canon: def flagged, fn/return/print accepted', () => {
+  const warnings = lintSource('def f():\n    print("x")\n    return None\n', { path: 'bad.gpy' });
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /bad\.gpy:1 style: use fn instead of def \(dense canon\)/);
-  assert.deepEqual(γlint('fn f(x)=x*2\nprint(f(2))\n', { path: 'ok.gpy' }), []);
+  assert.deepEqual(lintSource('fn f(x)=x*2\nprint(f(2))\n', { path: 'ok.gpy' }), []);
 });
 
 τ('Υ lint catches host-boundary glyph corruption in import module names', () => {
@@ -78,9 +78,9 @@ function τ(name, fn) {
   }
 });
 
-τ('γlint flags capability usage: process, network, file write, dynamic code', () => {
+τ('lintSource flags capability usage: process, network, file write, dynamic code', () => {
   const src = 'import subprocess\nsubprocess.run(["ls"])\nurllib.request.urlopen("http://x")\nopen("x.txt", "w")\neval("1+1")\n';
-  const warnings = γlint(src, { path: 'caps.gpy' });
+  const warnings = lintSource(src, { path: 'caps.gpy' });
   const text = warnings.join('\n');
   assert.match(text, /caps\.gpy:1 capability: process execution/);
   assert.match(text, /caps\.gpy:3 capability: network access/);
@@ -88,9 +88,9 @@ function τ(name, fn) {
   assert.match(text, /caps\.gpy:5 capability: dynamic code execution/);
 });
 
-τ('γlint never flags capability or style patterns inside string literals', () => {
+τ('lintSource never flags capability or style patterns inside string literals', () => {
   const src = 'msg="import subprocess and urllib and open(x,\'w\') and eval()"\ntext="def not flagged"\nprint(msg)\n';
-  assert.deepEqual(γlint(src, { path: 'strings.gpy' }), []);
+  assert.deepEqual(lintSource(src, { path: 'strings.gpy' }), []);
 });
 
 τ('Υ fmt and lint with no file process the whole project tree', () => {

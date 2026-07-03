@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompileWithMap } from '../../src/densepy/compiler.mjs';
+import { compileWithSourceMap } from '../../src/densepy/compiler.mjs';
 
 const ρ = new URL('../..', import.meta.url).pathname;
 const Υ = join(ρ, 'bin/gpy.mjs');
@@ -32,7 +32,7 @@ function pyCompile(src) {
 
 τ('γ compile emits source-map JSON with source/generated spans for aliases', () => {
   const src = `λ φ(ν):\n    ⎇ ν ≤ Ⅰ:\n        ⊢ ν\n☉(φ(Ⅰ))\n`;
-  const out = γcompileWithMap(src, { sourcePath: 'demo.gpy', generatedPath: 'demo.py' });
+  const out = compileWithSourceMap(src, { sourcePath: 'demo.gpy', generatedPath: 'demo.py' });
 
   assert.equal(out.code, `def φ(ν):\n    if ν <= 1:\n        return ν\nprint(φ(1))\n`);
   assert.equal(out.map.version, 1);
@@ -53,7 +53,7 @@ function pyCompile(src) {
 
 τ('γ tokenizer protects comments, strings, triple strings, f-strings, and imports', () => {
   const src = `# λ ≤ Ⅰ comment stays\nimport json\nfrom pathlib import Path as Ρθ\nα ≔ "λ ≤ Ⅰ string stays"\nβ ≔ r'λ ≤ Ⅰ raw stays'\nχ ≔ f"λ ≤ Ⅰ fstring stays {1 + 1}"\nδ ≔ """λ ≤ Ⅰ triple stays"""\n☉(Ⅰ)\n`;
-  const out = γcompileWithMap(src, { sourcePath: 'protect.gpy' });
+  const out = compileWithSourceMap(src, { sourcePath: 'protect.gpy' });
 
   assert.match(out.code, /# λ ≤ Ⅰ comment stays/);
   assert.match(out.code, /import json/);

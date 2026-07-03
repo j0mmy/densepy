@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompileWithMap, γcheck } from '../compiler.mjs';
+import { compileWithSourceMap, checkSource } from '../compiler.mjs';
 import { positionalFile } from './args.mjs';
 import { remapNote, agentErrorLine } from './diagnostics.mjs';
 import { resolvePython } from './python.mjs';
@@ -46,9 +46,9 @@ export function cmdCheck(argv) {
   if (!file) return badUsage();
   const src = readFileSync(file, 'utf8');
   const agent = argv.includes('--agent');
-  const result = γcompileWithMap(src, { sourcePath: file });
+  const result = compileWithSourceMap(src, { sourcePath: file });
   if (argv.includes('--show-py')) printEmittedPython(result.code);
-  const check = γcheck(src);
+  const check = checkSource(src);
   if ((check.status ?? 1) !== 0) {
     if (agent) {
       process.stderr.write(agentErrorLine(file, src, check.stderr, result.lineOffset));

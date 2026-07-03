@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { γcompile, γrun } from '../../src/densepy/compiler.mjs';
+import { compileToPython, runSource } from '../../src/densepy/compiler.mjs';
 
 function τ(name, fn) {
   try {
@@ -14,52 +14,52 @@ function τ(name, fn) {
 
 τ('Σ and Π macros lower to Python aggregate expressions and execute', () => {
   const src = `xs ≔ [1,2,3,4]\n☉(Σ(ν∈xs) ν×ν)\n☉(Π(ν∈xs) ν)\n`;
-  const py = γcompile(src);
+  const py = compileToPython(src);
   assert.match(py, /sum\(\(ν \* ν\) for ν in xs\)/);
   assert.match(py, /math\.prod\(\(ν\) for ν in xs\)/);
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(r.stdout.trim().split('\n'), ['30', '24']);
 });
 
 τ('π guarded projection macro lowers to Python list comprehension and executes', () => {
   const src = `xs ≔ [1,2,3,4,5,6]\nys ≔ π(ν∈xs|ν % 2 ≅ 0) ν×ν\n☉(ys)\n`;
-  const py = γcompile(src);
+  const py = compileToPython(src);
   assert.match(py, /\[\(ν \* ν\) for ν in xs if ν % 2 == 0\]/);
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), '[4, 16, 36]');
 });
 
 τ('∘ composition macro lowers to nested calls and executes', () => {
   const src = `λ f(x):\n    ⊢ x + 1\nλ g(x):\n    ⊢ x × 2\n☉((f∘g)(3))\n`;
-  const py = γcompile(src);
+  const py = compileToPython(src);
   assert.match(py, /print\(f\(g\(3\)\)\)/);
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), '7');
 });
 
 τ('v2: macro bodies and guards may contain calls, strings, subscripts, and commas', () => {
   const src = `rows ≔ [{"s": 5}, {"s": 12}, {"s": 8}]\nΩ ≔ Σ(ρ∈rows) int(ρ["s"])\nhi ≔ π(ρ∈rows|ρ["s"] ≥ 8) max(ρ["s"], 10)\n☉(Ω)\n☉(hi)\n`;
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(r.stdout.trim().split('\n'), ['25', '[12, 10]']);
 });
 
 τ('v2: nested macros, guarded Σ, and composition with multi-arg calls', () => {
   const src = `xss ≔ [[1, 2], [3, 4]]\ntot ≔ Σ(ξ∈xss) Σ(χ∈ξ) χ\nevens ≔ Σ(χ∈range(10)|χ % 2 ≅ 0) χ\nλ f(x):\n    ⊢ x + 1\nλ g(x, y):\n    ⊢ x × y\n☉(tot, evens, (f∘g)(2, 3))\n`;
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), '10 20 7');
 });
 
 τ('macro glyphs inside comments and strings are preserved', () => {
   const src = `# Σ(ν∈xs) ν stays\ns ≔ "π(ν∈xs|⊤) ν and (f∘g)(x) stay"\n☉(s)\n`;
-  const py = γcompile(src);
+  const py = compileToPython(src);
   assert.match(py, /# Σ\(ν∈xs\) ν stays/);
   assert.match(py, /"π\(ν∈xs\|⊤\) ν and \(f∘g\)\(x\) stay"/);
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), 'π(ν∈xs|⊤) ν and (f∘g)(x) stay');
 });

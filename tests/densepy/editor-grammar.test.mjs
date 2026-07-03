@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ΓMAP } from '../../src/densepy/compiler.mjs';
+import { GLYPH_TABLES } from '../../src/densepy/compiler.mjs';
 
 const ρ = new URL('../..', import.meta.url).pathname;
 
@@ -30,9 +30,9 @@ function τ(name, fn) {
 τ('every compiler glyph is covered by the TextMate grammar', () => {
   const grammarText = readFileSync(join(ρ, 'editors/vscode/syntaxes/gpy.tmLanguage.json'), 'utf8');
   const glyphs = [
-    ...Object.keys(ΓMAP.word),
-    ...Object.keys(ΓMAP.op),
-    ...Object.keys(ΓMAP.num),
+    ...Object.keys(GLYPH_TABLES.word),
+    ...Object.keys(GLYPH_TABLES.op),
+    ...Object.keys(GLYPH_TABLES.num),
   ];
   const missing = glyphs.filter((g) => !grammarText.includes(g));
   assert.deepEqual(missing, [], `glyphs missing from grammar: ${missing.join(' ')}`);

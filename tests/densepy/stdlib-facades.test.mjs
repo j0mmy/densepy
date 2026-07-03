@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { γcompile, γrun } from '../../src/densepy/compiler.mjs';
+import { compileToPython, runSource } from '../../src/densepy/compiler.mjs';
 
 function τ(name, fn) {
   try {
@@ -31,12 +31,12 @@ function pyCompile(src) {
   const root = mkdtempSync(join(tmpdir(), 'γpy-std-json-'));
   try {
     const src = `Δ ≔ {"name":"JT","score":10}\nJSON.write("data.json", Δ)\nΩ ≔ JSON.read("data.json")\nΡ ≔ Path.join(".", "name.txt")\nFile.write(Ρ, Ω["name"])\n☉(File.read(Ρ))\n☉(JSON.dumps({"ok":⊤}))\n`;
-    const py = γcompile(src);
+    const py = compileToPython(src);
     assert.match(py, /class JSON/);
     assert.match(py, /class File/);
     assert.match(py, /class Path/);
     assert.equal(pyCompile(py).status, 0, py);
-    const r = γrun(src, { cwd: root });
+    const r = runSource(src, { cwd: root });
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(r.stdout.trim().split('\n'), ['JT', '{"ok": true}']);
   } finally {
@@ -48,11 +48,11 @@ function pyCompile(src) {
   const root = mkdtempSync(join(tmpdir(), 'γpy-std-csv-'));
   try {
     const src = `rows ≔ [{"name":"a","score":1},{"name":"b","score":2}]\nCSV.write("rows.csv", rows, ["name", "score"])\nout ≔ CSV.read("rows.csv")\n☉(out[1]["name"] + ":" + out[1]["score"])\n☉(HTTP.get_text("data:text/plain,hello").strip())\n`;
-    const py = γcompile(src);
+    const py = compileToPython(src);
     assert.match(py, /class CSV/);
     assert.match(py, /class HTTP/);
     assert.equal(pyCompile(py).status, 0, py);
-    const r = γrun(src, { cwd: root });
+    const r = runSource(src, { cwd: root });
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(r.stdout.trim().split('\n'), ['b:2', 'hello']);
   } finally {
@@ -62,27 +62,27 @@ function pyCompile(src) {
 
 τ('Table facade uses Πδ alias and reports a clear pandas install boundary', () => {
   const src = `try:\n    Πδ.require()\n    ☉("table-ok")\nexcept ImportError as ε:\n    ☉(str(ε))\n`;
-  const py = γcompile(src);
+  const py = compileToPython(src);
   assert.match(py, /Πδ = Table/);
   assert.equal(pyCompile(py).status, 0, py);
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout.trim(), /^(table-ok|GlyphPython Table facade requires pandas: pip install pandas)$/);
 });
 
 τ('facade names inside strings and comments do not inject the prelude', () => {
   const src = `# JSON and File are mentioned here only\n☉("JSON is a data format")\n`;
-  const py = γcompile(src);
+  const py = compileToPython(src);
   assert.doesNotMatch(py, /class JSON/);
   assert.doesNotMatch(py, /class File/);
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), 'JSON is a data format');
 });
 
 τ('foreign Python imports remain usable beside γ facades', () => {
   const src = `import json as ξjson\n☉(ξjson.dumps({"edge": 1}))\n☉(JSON.dumps({"facade": 2}))\n`;
-  const r = γrun(src);
+  const r = runSource(src);
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(r.stdout.trim().split('\n'), ['{"edge": 1}', '{"facade": 2}']);
 });

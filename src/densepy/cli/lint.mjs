@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import { γlint } from '../compiler.mjs';
+import { lintSource } from '../compiler.mjs';
 import { positionalFile } from './args.mjs';
 import { projectFiles } from './project.mjs';
 
@@ -20,7 +20,7 @@ export function cmdLint(argv) {
       return 1;
     }
     const warnings = files.flatMap((path) =>
-      γlint(readFileSync(path, 'utf8'), { path: relative(process.cwd(), path) }));
+      lintSource(readFileSync(path, 'utf8'), { path: relative(process.cwd(), path) }));
     if (warnings.length) {
       emit(warnings);
       return 1;
@@ -28,7 +28,7 @@ export function cmdLint(argv) {
     process.stdout.write(agent ? `ok ${files.length} files\n` : `lint OK ${files.length} files\n`);
     return 0;
   }
-  const warnings = γlint(readFileSync(file, 'utf8'), { path: file });
+  const warnings = lintSource(readFileSync(file, 'utf8'), { path: file });
   if (warnings.length) {
     emit(warnings);
     return 1;

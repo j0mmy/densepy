@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { γcompile } from '../src/densepy/compiler.mjs';
+import { compileToPython } from '../src/densepy/compiler.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const CORPUS = join(HERE, 'corpus');
@@ -49,7 +49,7 @@ for (const name of readdirSync(CORPUS).sort()) {
   total += 1;
   const fixtureDir = join(CORPUS, 'fixtures', name.replace(/\.gpy$/, ''));
   try {
-    const jsMods = files.map(([p, out]) => [out, γcompile(readFileSync(p, 'utf8'))]);
+    const jsMods = files.map(([p, out]) => [out, compileToPython(readFileSync(p, 'utf8'))]);
     const selfMods = files.map(([p, out]) => [out, selfCompile(p)]);
     const bytesEqual = jsMods.every(([, code], i) => code === selfMods[i][1]);
     if (bytesEqual) identical += 1;

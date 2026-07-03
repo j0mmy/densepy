@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { γcompileWithMap, γrun } from '../compiler.mjs';
+import { compileWithSourceMap, runSource } from '../compiler.mjs';
 import { positionalFile, argvAfterDash } from './args.mjs';
 import { remapNote, agentErrorLine } from './diagnostics.mjs';
 import { buildProject, remapProjectTraceback, projectEntry } from './project.mjs';
@@ -35,8 +35,8 @@ export function cmdRun(argv) {
   }
   const src = readFileSync(file, 'utf8');
   const agent = argv.includes('--agent');
-  const { lineOffset } = γcompileWithMap(src);
-  const result = γrun(src, { argv: argvAfterDash(argv), fileBacked: true, python: resolvePython() });
+  const { lineOffset } = compileWithSourceMap(src);
+  const result = runSource(src, { argv: argvAfterDash(argv), fileBacked: true, python: resolvePython() });
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) {
     if (agent && (result.status ?? 1) !== 0) {

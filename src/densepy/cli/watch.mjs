@@ -1,6 +1,6 @@
 import { readFileSync, watch } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
-import { γcompileWithMap, γcheck } from '../compiler.mjs';
+import { compileWithSourceMap, checkSource } from '../compiler.mjs';
 import { positionalFile } from './args.mjs';
 import { remapNote } from './diagnostics.mjs';
 import { gpySection, readManifest } from './manifest.mjs';
@@ -26,8 +26,8 @@ export function cmdWatch(argv) {
     const list = files();
     for (const path of list) {
       const src = readFileSync(path, 'utf8');
-      const { lineOffset } = γcompileWithMap(src);
-      const check = γcheck(src, { python: resolvePython() });
+      const { lineOffset } = compileWithSourceMap(src);
+      const check = checkSource(src, { python: resolvePython() });
       if ((check.status ?? 1) !== 0) {
         failed += 1;
         const rel = relative(process.cwd(), path);

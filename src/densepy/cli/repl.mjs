@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { γcompileWithMap, γprelude } from '../compiler.mjs';
+import { compileWithSourceMap, facadePrelude } from '../compiler.mjs';
 import { resolvePython } from './python.mjs';
 
 // Returns null: exits with the python driver's code when stdin closes.
@@ -8,7 +8,7 @@ export function cmdRepl() {
   const driver = [
     'import sys, codeop, math',
     'ns = {"math": math}',
-    `exec(compile(${JSON.stringify(γprelude())}, '<γprelude>', 'exec'), ns)`,
+    `exec(compile(${JSON.stringify(facadePrelude())}, '<γprelude>', 'exec'), ns)`,
     "buf = ''",
     'while True:',
     '    line = sys.stdin.readline()',
@@ -35,7 +35,7 @@ export function cmdRepl() {
   process.stderr.write('GlyphPython REPL (ctrl-d to exit)\n');
   const rl = createInterface({ input: process.stdin });
   rl.on('line', (line) => {
-    const compiled = γcompileWithMap(line, { bare: true }).code;
+    const compiled = compileWithSourceMap(line, { bare: true }).code;
     py.stdin.write(`${compiled}\n`);
   });
   rl.on('close', () => py.stdin.end());

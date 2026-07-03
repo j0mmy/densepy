@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
-import { γcompileWithMap } from '../compiler.mjs';
+import { compileWithSourceMap } from '../compiler.mjs';
 import { gpySection, readManifest } from './manifest.mjs';
 
 export function findGpyFiles(dir, out = []) {
@@ -29,7 +29,7 @@ export function buildProject() {
     const outPath = join(emitDir, rel.replace(/\.gpy$/, '.py'));
     mkdirSync(dirname(outPath), { recursive: true });
     const src = readFileSync(file, 'utf8');
-    const compiled = γcompileWithMap(src, { sourcePath: file, generatedPath: outPath });
+    const compiled = compileWithSourceMap(src, { sourcePath: file, generatedPath: outPath });
     writeFileSync(outPath, compiled.code);
     modules.push({ gpy: file, py: outPath, source: src, lineOffset: compiled.lineOffset });
   }

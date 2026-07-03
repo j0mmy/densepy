@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { γrun } from '../compiler.mjs';
+import { runSource } from '../compiler.mjs';
 import { findGpyFiles } from './project.mjs';
 
 export function cmdTest(argv) {
@@ -8,7 +8,7 @@ export function cmdTest(argv) {
   let pass = 0;
   let fail = 0;
   for (const file of files) {
-    const result = γrun(readFileSync(file, 'utf8'), { fileBacked: true });
+    const result = runSource(readFileSync(file, 'utf8'), { fileBacked: true });
     if ((result.status ?? 1) === 0) pass++;
     else {
       fail++;

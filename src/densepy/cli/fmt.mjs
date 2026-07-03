@@ -1,12 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import { γformat, γdense } from '../compiler.mjs';
+import { formatSource, densify } from '../compiler.mjs';
 import { projectFiles } from './project.mjs';
 
 export function cmdFmt(argv) {
   const checkOnly = argv.includes('--check');
   const denseMode = argv.includes('--dense');
-  const format = denseMode ? γdense : γformat;
+  const format = denseMode ? densify : formatSource;
   const file = argv.find((x, i) => i > 0 && !x.startsWith('--'));
   if (!file) {
     let files;
