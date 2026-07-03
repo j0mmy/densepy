@@ -2,6 +2,18 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import {
+  isIdentChar as γid,
+  scanStringEnd,
+  scanCommentEnd,
+  matchBracket,
+  topLevelIndex,
+  expressionEnd,
+  isFStringQuote,
+  rewriteFString,
+  walkRegions,
+  lineRecords,
+} from './walk.mjs';
 
 // γ→py: project-owned γ surface, Python owns the λ runtime boundary.
 const ΓWORD = new Map(Object.entries({
@@ -49,10 +61,6 @@ function γusesStdFacade(source) {
     return chunk;
   });
   return ΓSTD_NAMES.some((name) => code.includes(name));
-}
-
-function γid(ch) {
-  return /[\p{L}\p{N}_]/u.test(ch ?? '');
 }
 
 function γloc() {
@@ -123,43 +131,11 @@ function γemitOp(ctx, sourceText, op, sourceStart) {
 }
 
 function γcopyString(src, i, ctx) {
-  const q = src[i];
-  const triple = src.slice(i, i + 3) === q.repeat(3);
-  const end = triple ? q.repeat(3) : q;
-  const start = i;
-  i += triple ? 3 : 1;
-  while (i < src.length) {
-    if (!triple && src[i] === '\\') {
-      i += 2;
-      continue;
-    }
-    if (triple && src.slice(i, i + 3) === end) {
-      i += 3;
-      break;
-    }
-    if (!triple && src[i] === q) {
-      i += 1;
-      break;
-    }
-    i += 1;
-  }
-  const text = src.slice(start, i);
+  const end = scanStringEnd(src, i);
+  const text = src.slice(i, end);
   γpush(ctx, text);
   γadvance(ctx.src, text);
-  return i;
-}
-
-function γfPrefix(src, i) {
-  // True when the quote at src[i] belongs to an f-string (f", rf', F""" ...).
-  let j = i - 1;
-  let letters = '';
-  while (j >= 0 && /[A-Za-z]/.test(src[j]) && letters.length < 3) {
-    letters = src[j] + letters;
-    j -= 1;
-  }
-  if (!letters || letters.length > 2) return false;
-  if (j >= 0 && γid(src[j])) return false;
-  return /[fF]/.test(letters) && /^[fFrRbBuU]+$/.test(letters);
+  return end;
 }
 
 function γmapExprChar(ch) {
@@ -169,63 +145,14 @@ function γmapExprChar(ch) {
   return null;
 }
 
-function γfstringText(src, i) {
-  // Literal text and {{ }} escapes stay raw; glyphs inside {…} replacement
-  // fields are rewritten; format specs (after top-level :) and nested plain
-  // string literals stay raw; nested f-strings recurse.
-  const q = src[i];
-  const triple = src.slice(i, i + 3) === q.repeat(3);
-  const endq = triple ? q.repeat(3) : q;
-  const start = i;
-  let out = '';
-  i += triple ? 3 : 1;
-  out += src.slice(start, i);
-  const frames = [];
-  while (i < src.length) {
-    const ch = src[i];
-    if (frames.length === 0) {
-      if (triple && src.slice(i, i + 3) === endq) { out += endq; i += 3; break; }
-      if (!triple && ch === q) { out += ch; i += 1; break; }
-      if (!triple && ch === '\\') { out += src.slice(i, i + 2); i += 2; continue; }
-      if (ch === '{' && src[i + 1] === '{') { out += '{{'; i += 2; continue; }
-      if (ch === '}' && src[i + 1] === '}') { out += '}}'; i += 2; continue; }
-      if (ch === '{') { frames.push({ spec: false }); out += ch; i += 1; continue; }
-      out += ch; i += 1; continue;
-    }
-    if (ch === '{') { frames.push({ spec: false }); out += ch; i += 1; continue; }
-    if (ch === '}') { frames.pop(); out += ch; i += 1; continue; }
-    const top = frames[frames.length - 1];
-    if (ch === ':' && !top.spec) { top.spec = true; out += ch; i += 1; continue; }
-    if (!top.spec && (ch === '"' || ch === "'")) {
-      if (γfPrefix(src, i)) {
-        const inner = γfstringText(src, i);
-        out += inner.out;
-        i = inner.end;
-        continue;
-      }
-      const nq = ch;
-      let j = i + 1;
-      while (j < src.length) {
-        if (src[j] === '\\') { j += 2; continue; }
-        if (src[j] === nq) { j += 1; break; }
-        j += 1;
-      }
-      out += src.slice(i, j);
-      i = j;
-      continue;
-    }
-    if (!top.spec && !(γid(ch) && γid(src[i - 1] ?? ''))) {
-      const mapped = γmapExprChar(ch);
-      if (mapped !== null) { out += mapped; i += 1; continue; }
-    }
-    out += ch;
-    i += 1;
-  }
-  return { out, end: i };
+// Glyphs never map when joined to an identifier char (Tλ is one identifier).
+function γmapFStringChar(ch, prev) {
+  if (γid(ch) && γid(prev)) return null;
+  return γmapExprChar(ch);
 }
 
 function γcopyFString(src, i, ctx) {
-  const { out, end } = γfstringText(src, i);
+  const { out, end } = rewriteFString(src, i, γmapFStringChar);
   γpush(ctx, out);
   γadvance(ctx.src, src.slice(i, end));
   return end;
@@ -239,68 +166,6 @@ function γcopyFString(src, i, ctx) {
 // Bodies/guards/iterables may contain calls, commas, strings, nested macros.
 // Body extent: balanced expression up to a top-level newline, ',', '#', or closer.
 
-function γscanStringEnd(src, i) {
-  const q = src[i];
-  const triple = src.slice(i, i + 3) === q.repeat(3);
-  const endq = triple ? q.repeat(3) : q;
-  i += triple ? 3 : 1;
-  while (i < src.length) {
-    if (!triple && src[i] === '\\') { i += 2; continue; }
-    if (triple && src.slice(i, i + 3) === endq) return i + 3;
-    if (!triple && src[i] === q) return i + 1;
-    i += 1;
-  }
-  return i;
-}
-
-function γmatchParen(src, i) {
-  let depth = 0;
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === '"' || ch === "'") { i = γscanStringEnd(src, i); continue; }
-    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
-    else if (ch === ')' || ch === ']' || ch === '}') {
-      depth -= 1;
-      if (depth === 0) return i;
-    }
-    i += 1;
-  }
-  return -1;
-}
-
-function γtopIndex(text, needle) {
-  let depth = 0;
-  let i = 0;
-  while (i < text.length) {
-    const ch = text[i];
-    if (ch === '"' || ch === "'") { i = γscanStringEnd(text, i); continue; }
-    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
-    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
-    else if (depth === 0 && ch === needle) return i;
-    i += 1;
-  }
-  return -1;
-}
-
-function γbodyEnd(src, i) {
-  // Top-level ':' ends the body so aggregates work inside compound-statement
-  // headers (`if all[x:xs]x>0:...`); a bare top-level lambda in a body is the
-  // one construct this forgoes (parenthesize it).
-  let depth = 0;
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === '"' || ch === "'") { i = γscanStringEnd(src, i); continue; }
-    if (depth === 0 && (ch === '\n' || ch === ',' || ch === '#' || ch === ':')) return i;
-    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
-    else if (ch === ')' || ch === ']' || ch === '}') {
-      if (depth === 0) return i;
-      depth -= 1;
-    }
-    i += 1;
-  }
-  return i;
-}
-
 const ΓIDENT = /^[\p{L}_][\p{L}\p{N}_]*$/u;
 
 function γparseAgg(src, i) {
@@ -308,21 +173,21 @@ function γparseAgg(src, i) {
   let j = i + 1;
   while (src[j] === ' ') j += 1;
   if (src[j] !== '(') return null;
-  const close = γmatchParen(src, j);
+  const close = matchBracket(src, j);
   if (close === -1) return null;
   const header = src.slice(j + 1, close);
-  const at = γtopIndex(header, '∈');
+  const at = topLevelIndex(header, '∈');
   if (at === -1) return null;
   const varName = header.slice(0, at).trim();
   if (!ΓIDENT.test(varName)) return null;
   const rest = header.slice(at + 1);
-  const bar = γtopIndex(rest, '|');
+  const bar = topLevelIndex(rest, '|');
   const iter = (bar === -1 ? rest : rest.slice(0, bar)).trim();
   const guard = bar === -1 ? null : rest.slice(bar + 1).trim();
   if (!iter) return null;
   let k = close + 1;
   while (src[k] === ' ' || src[k] === '\t') k += 1;
-  const end = γbodyEnd(src, k);
+  const end = expressionEnd(src, k);
   const body = src.slice(k, end).trim();
   if (!body) return null;
   const B = γexpandCore(body);
@@ -338,7 +203,7 @@ function γparseAgg(src, i) {
 }
 
 function γparseCompose(src, i) {
-  const close = γmatchParen(src, i);
+  const close = matchBracket(src, i);
   if (close === -1) return null;
   const inner = src.slice(i + 1, close);
   if (!inner.includes('∘')) return null;
@@ -347,7 +212,7 @@ function γparseCompose(src, i) {
   let k = close + 1;
   while (src[k] === ' ') k += 1;
   if (src[k] !== '(') return null;
-  const argsClose = γmatchParen(src, k);
+  const argsClose = matchBracket(src, k);
   if (argsClose === -1) return null;
   const args = γexpandCore(src.slice(k + 1, argsClose));
   let call = `${names[names.length - 1]}(${args})`;
@@ -372,22 +237,22 @@ const ΓEXPR_START = /[\p{L}\p{N}_"'([{¬−+-]/u;
 function γparseAsciiAgg(src, i, word) {
   const open = i + word.length;
   if (src[open] !== '[') return null;
-  const close = γmatchParen(src, open);
+  const close = matchBracket(src, open);
   if (close === -1) return null;
   const header = src.slice(open + 1, close);
-  const at = γtopIndex(header, ':');
+  const at = topLevelIndex(header, ':');
   if (at === -1) return null;
   const varName = header.slice(0, at).trim();
   if (!ΓIDENT.test(varName)) return null;
   const rest = header.slice(at + 1);
-  const bar = γtopIndex(rest, '|');
+  const bar = topLevelIndex(rest, '|');
   const iter = (bar === -1 ? rest : rest.slice(0, bar)).trim();
   const guard = bar === -1 ? null : rest.slice(bar + 1).trim();
   if (!iter) return null;
   let k = close + 1;
   while (src[k] === ' ' || src[k] === '\t') k += 1;
   if (!ΓEXPR_START.test(src[k] ?? '')) return null;
-  const end = γbodyEnd(src, k);
+  const end = expressionEnd(src, k);
   const body = src.slice(k, end).trim();
   if (!body) return null;
   const G = guard ? ` if ${γexpandCore(guard)}` : '';
@@ -404,7 +269,7 @@ function γparseFn(src, i) {
   if (!name || !ΓIDENT.test(name)) return null;
   while (src[j] === ' ') j += 1;
   if (src[j] !== '(') return null;
-  const close = γmatchParen(src, j);
+  const close = matchBracket(src, j);
   if (close === -1) return null;
   const params = γexpandCore(src.slice(j + 1, close));
   let k = close + 1;
@@ -435,14 +300,13 @@ function γexpandCore(src) {
   while (i < src.length) {
     const ch = src[i];
     if (ch === '#') {
-      const j = src.indexOf('\n', i);
-      if (j === -1) { out += src.slice(i); break; }
+      const j = scanCommentEnd(src, i);
       out += src.slice(i, j);
       i = j;
       continue;
     }
     if (ch === '"' || ch === "'") {
-      const j = γscanStringEnd(src, i);
+      const j = scanStringEnd(src, i);
       out += src.slice(i, j);
       i = j;
       continue;
@@ -514,19 +378,18 @@ export function γcompileWithMap(source, opts = {}) {
 
     // #… stays λ-literal; no γ rewrites inside comments.
     if (ch === '#') {
-      const j = src.indexOf('\n', i);
-      const text = j === -1 ? src.slice(i) : src.slice(i, j);
+      const j = scanCommentEnd(src, i);
+      const text = src.slice(i, j);
       γpush(ctx, text);
       γadvance(ctx.src, text);
-      i += text.length;
-      if (j === -1) break;
+      i = j;
       continue;
     }
 
     // Strings stay λ-literal, except f-string {…} expressions which are code.
     // Prefixes (f/r/b/u) are copied before quote naturally.
     if (ch === '"' || ch === "'") {
-      i = γfPrefix(src, i) ? γcopyFString(src, i, ctx) : γcopyString(src, i, ctx);
+      i = isFStringQuote(src, i) ? γcopyFString(src, i, ctx) : γcopyString(src, i, ctx);
       continue;
     }
 
@@ -601,56 +464,10 @@ export function γcompile(source) {
 function γrewriteCodeOnly(source, rewrite) {
   const src = String(source);
   const out = [];
-  let code = '';
-  let i = 0;
-  const flush = () => {
-    if (code) {
-      out.push(rewrite(code));
-      code = '';
-    }
-  };
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === '#') {
-      flush();
-      const j = src.indexOf('\n', i);
-      if (j === -1) {
-        out.push(src.slice(i));
-        return out.join('');
-      }
-      out.push(src.slice(i, j));
-      i = j;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      flush();
-      const q = ch;
-      const triple = src.slice(i, i + 3) === q.repeat(3);
-      const end = triple ? q.repeat(3) : q;
-      const start = i;
-      i += triple ? 3 : 1;
-      while (i < src.length) {
-        if (!triple && src[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (triple && src.slice(i, i + 3) === end) {
-          i += 3;
-          break;
-        }
-        if (!triple && src[i] === q) {
-          i += 1;
-          break;
-        }
-        i += 1;
-      }
-      out.push(src.slice(start, i));
-      continue;
-    }
-    code += ch;
-    i += 1;
+  for (const region of walkRegions(src)) {
+    const text = src.slice(region.start, region.end);
+    out.push(region.kind === 'code' ? rewrite(text) : text);
   }
-  flush();
   return out.join('');
 }
 
@@ -667,43 +484,6 @@ export function γformat(source) {
 // spacing, 1-space indents, single-statement block collapse, blank strip.
 const ΓCOMPOUND_START = /^(if|elif|else|for|while|def|class|with|try|except|finally|match|case|async|fn|@|λ|⎇|∴|↻|∀)/u;
 
-function γdenseLines(src) {
-  const recs = [];
-  let lineStart = 0;
-  let lineDepth = 0;
-  let lineInString = false;
-  let d = 0;
-  let i = 0;
-  const endLine = (endIdx, nextInString) => {
-    recs.push({ start: lineStart, end: endIdx, depth: lineDepth, inString: lineInString });
-    lineStart = endIdx + 1;
-    lineDepth = d;
-    lineInString = nextInString;
-  };
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === '\n') { endLine(i, false); i += 1; continue; }
-    if (ch === '#') {
-      const j = src.indexOf('\n', i);
-      if (j === -1) { i = src.length; break; }
-      i = j;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      const j = γscanStringEnd(src, i);
-      let k = src.indexOf('\n', i);
-      while (k !== -1 && k < j) { endLine(k, true); k = src.indexOf('\n', k + 1); }
-      i = j;
-      continue;
-    }
-    if (ch === '(' || ch === '[' || ch === '{') d += 1;
-    else if (ch === ')' || ch === ']' || ch === '}') d = Math.max(0, d - 1);
-    i += 1;
-  }
-  if (lineStart < src.length) recs.push({ start: lineStart, end: src.length, depth: lineDepth, inString: lineInString });
-  return recs;
-}
-
 export function γdense(source) {
   const tightened = γrewriteCodeOnly(String(source), (code) => code.replace(/ +/g, (m, off, s) => {
     const a = s[off - 1];
@@ -714,7 +494,7 @@ export function γdense(source) {
   }));
 
   const lines = [];
-  for (const rec of γdenseLines(tightened)) {
+  for (const rec of lineRecords(tightened)) {
     let text = tightened.slice(rec.start, rec.end);
     if (rec.inString || rec.depth > 0) {
       lines.push({ text, protected: true });
@@ -759,24 +539,9 @@ function γblankStrings(source) {
   // and the per-line comment stripper cannot be fooled by '#' in a string.
   const src = String(source);
   let out = '';
-  let i = 0;
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === '"' || ch === "'") {
-      const j = γscanStringEnd(src, i);
-      out += src.slice(i, j).replace(/[^\n]/gu, ' ');
-      i = j;
-      continue;
-    }
-    if (ch === '#') {
-      const j = src.indexOf('\n', i);
-      const end = j === -1 ? src.length : j;
-      out += src.slice(i, end);
-      i = end;
-      continue;
-    }
-    out += ch;
-    i += 1;
+  for (const region of walkRegions(src)) {
+    const text = src.slice(region.start, region.end);
+    out += region.kind === 'string' ? text.replace(/[^\n]/gu, ' ') : text;
   }
   return out;
 }
