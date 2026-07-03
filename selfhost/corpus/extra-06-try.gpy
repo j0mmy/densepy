@@ -1,0 +1,11 @@
+fn boom()=1//0
+☉(try[boom()]'caught')
+☉(try[int('x')|ValueError]-1)
+calls ≔ []
+fn lazy():
+ calls.append(1)
+ ⊢'fallback'
+☉(try[2+2]lazy())
+☉(len(calls))
+xs ≔ [10,20]
+☉(try[xs[5]|IndexError]xs[0])
