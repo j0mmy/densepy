@@ -20,5 +20,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm test
-      - run: node bin/gpy.mjs run examples/glyph-python/factorial.gpy
+      - run: node bin/gpy.mjs run examples/densepy/factorial.gpy
       - run: node bin/gpy.mjs --version
