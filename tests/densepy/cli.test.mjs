@@ -171,6 +171,40 @@ function τ(name, fn) {
   }
 });
 
+τ('Υ pack --px renders PNG pages via pxpipe with image-token accounting', () => {
+  const home = process.env.PXPIPE_HOME ?? join(process.env.HOME ?? '', 'src/pxpipe');
+  if (!existsSync(join(home, 'dist/core/index.js'))) {
+    console.log('SKIP pack --px render (no built pxpipe at PXPIPE_HOME or ~/src/pxpipe)');
+    return;
+  }
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-packpx-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'pxpack']).status, 0);
+    writeFileSync(join(root, 'src', 'util.gpy'), 'fn double(x)=x*2\n');
+    const out = join(root, 'px-out');
+    const r = ψ(['pack', '--px', '-o', out], { cwd: root, env: { PXPIPE_HOME: home } });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.ok(existsSync(join(out, 'pack-1.png')), 'pack-1.png not written');
+    assert.match(r.stdout, /pack-1\.png/);
+    assert.match(r.stderr, /pack: 2 files, \d+ chars, ~\d+ tokens/);
+    assert.match(r.stderr, /px: 1 page\(s\), ~\d+ image tokens/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+τ('Υ pack --px without pxpipe fails closed with an install hint', () => {
+  const root = mkdtempSync(join(tmpdir(), 'γpy-cli-packpx-miss-'));
+  try {
+    assert.equal(ψ(['init', root, '--name', 'pxmiss']).status, 0);
+    const r = ψ(['pack', '--px'], { cwd: root, env: { PXPIPE_HOME: join(root, 'nowhere') } });
+    assert.equal(r.status, 1, r.stderr + r.stdout);
+    assert.match(r.stderr, /pxpipe not found/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 τ('Υ run --safe allows pure code but blocks writes, network, and subprocess', () => {
   const root = mkdtempSync(join(tmpdir(), 'γpy-cli-safe-'));
   try {

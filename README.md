@@ -71,8 +71,16 @@ node bin/gpy.mjs watch [file.gpy]
 node bin/gpy.mjs repl
 node bin/gpy.mjs lsp
 node bin/gpy.mjs check <file.gpy> --types
+node bin/gpy.mjs pack [files] [--packet] [--px [-o dir]]
 node bin/gpy.mjs --version
 ```
+
+`pack --px` renders the context blob as dense PNG page(s) via
+[pxpipe](https://github.com/teamchong/pxpipe) (optional; set `PXPIPE_HOME` to a
+built checkout or install `pxpipe-proxy`) — vision tokens carry dense text at a
+fraction of BPE cost. Measured on this repo's own pack blob: 5,780 text tokens
+→ ~851 image tokens (0.15×). Lossy for byte-exact recall — use for orientation
+context, re-read files before editing.
 
 The full language reference (glyph tables, macro grammar, identifier rules,
 known limits, measured token density) lives in `docs/SPEC.md`.

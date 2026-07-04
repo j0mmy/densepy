@@ -33,5 +33,6 @@ function main(argv) {
 }
 
 // watch/repl/lsp return null: they own the process lifetime.
-const code = main(process.argv.slice(2));
+// await: pack --px is async; sync commands pass through unchanged.
+const code = await main(process.argv.slice(2));
 if (code !== null) process.exit(code);
